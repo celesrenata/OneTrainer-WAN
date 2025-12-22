@@ -15,6 +15,7 @@ from modules.dataLoader.StableDiffusion3BaseDataLoader import StableDiffusion3Ba
 from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBaseDataLoader
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
 from modules.dataLoader.StableDiffusionXLBaseDataLoader import StableDiffusionXLBaseDataLoader
+from modules.dataLoader.WanBaseDataLoader import WanBaseDataLoader
 from modules.dataLoader.WuerstchenBaseDataLoader import WuerstchenBaseDataLoader
 from modules.dataLoader.ZImageBaseDataLoader import ZImageBaseDataLoader
 from modules.model.BaseModel import BaseModel
@@ -48,6 +49,9 @@ from modules.modelLoader.StableDiffusionLoRAModelLoader import StableDiffusionLo
 from modules.modelLoader.StableDiffusionXLEmbeddingModelLoader import StableDiffusionXLEmbeddingModelLoader
 from modules.modelLoader.StableDiffusionXLFineTuneModelLoader import StableDiffusionXLFineTuneModelLoader
 from modules.modelLoader.StableDiffusionXLLoRAModelLoader import StableDiffusionXLLoRAModelLoader
+from modules.modelLoader.WanEmbeddingModelLoader import WanEmbeddingModelLoader
+from modules.modelLoader.WanFineTuneModelLoader import WanFineTuneModelLoader
+from modules.modelLoader.WanLoRAModelLoader import WanLoRAModelLoader
 from modules.modelLoader.WuerstchenEmbeddingModelLoader import WuerstchenEmbeddingModelLoader
 from modules.modelLoader.WuerstchenFineTuneModelLoader import WuerstchenFineTuneModelLoader
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
@@ -96,6 +100,9 @@ from modules.modelSaver.StableDiffusionLoRAModelSaver import StableDiffusionLoRA
 from modules.modelSaver.StableDiffusionXLEmbeddingModelSaver import StableDiffusionXLEmbeddingModelSaver
 from modules.modelSaver.StableDiffusionXLFineTuneModelSaver import StableDiffusionXLFineTuneModelSaver
 from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXLLoRAModelSaver
+from modules.modelSaver.WanEmbeddingModelSaver import WanEmbeddingModelSaver
+from modules.modelSaver.WanFineTuneModelSaver import WanFineTuneModelSaver
+from modules.modelSaver.WanLoRAModelSaver import WanLoRAModelSaver
 from modules.modelSaver.WuerstchenEmbeddingModelSaver import WuerstchenEmbeddingModelSaver
 from modules.modelSaver.WuerstchenFineTuneModelSaver import WuerstchenFineTuneModelSaver
 from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
@@ -132,6 +139,9 @@ from modules.modelSetup.StableDiffusionLoRASetup import StableDiffusionLoRASetup
 from modules.modelSetup.StableDiffusionXLEmbeddingSetup import StableDiffusionXLEmbeddingSetup
 from modules.modelSetup.StableDiffusionXLFineTuneSetup import StableDiffusionXLFineTuneSetup
 from modules.modelSetup.StableDiffusionXLLoRASetup import StableDiffusionXLLoRASetup
+from modules.modelSetup.WanEmbeddingSetup import WanEmbeddingSetup
+from modules.modelSetup.WanFineTuneSetup import WanFineTuneSetup
+from modules.modelSetup.WanLoRASetup import WanLoRASetup
 from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
@@ -208,6 +218,8 @@ def create_model_loader(
                 return HunyuanVideoFineTuneModelLoader()
             if model_type.is_hi_dream():
                 return HiDreamFineTuneModelLoader()
+            if model_type.is_wan():
+                return WanFineTuneModelLoader()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelLoader()
@@ -236,6 +248,8 @@ def create_model_loader(
                 return HunyuanVideoLoRAModelLoader()
             if model_type.is_hi_dream():
                 return HiDreamLoRAModelLoader()
+            if model_type.is_wan():
+                return WanLoRAModelLoader()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelLoader()
@@ -257,6 +271,8 @@ def create_model_loader(
                 return HunyuanVideoEmbeddingModelLoader()
             if model_type.is_hi_dream():
                 return HiDreamEmbeddingModelLoader()
+            if model_type.is_wan():
+                return WanEmbeddingModelLoader()
 
     return None
 
@@ -289,6 +305,8 @@ def create_model_saver(
                 return SanaFineTuneModelSaver()
             if model_type.is_hunyuan_video():
                 return HunyuanVideoFineTuneModelSaver()
+            if model_type.is_wan():
+                return WanFineTuneModelSaver()
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneModelSaver()
@@ -317,6 +335,8 @@ def create_model_saver(
                 return HunyuanVideoLoRAModelSaver()
             if model_type.is_hi_dream():
                 return HiDreamLoRAModelSaver()
+            if model_type.is_wan():
+                return WanLoRAModelSaver()
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingModelSaver()
@@ -338,6 +358,8 @@ def create_model_saver(
                 return HunyuanVideoEmbeddingModelSaver()
             if model_type.is_hi_dream():
                 return HiDreamEmbeddingModelSaver()
+            if model_type.is_wan():
+                return WanEmbeddingModelSaver()
 
     return None
 
@@ -375,6 +397,8 @@ def create_model_setup(
                 return HunyuanVideoFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_hi_dream():
                 return HiDreamFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_wan():
+                return WanFineTuneSetup(train_device, temp_device, debug_mode)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeSetup(train_device, temp_device, debug_mode)
@@ -403,6 +427,8 @@ def create_model_setup(
                 return HunyuanVideoLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_hi_dream():
                 return HiDreamLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_wan():
+                return WanLoRASetup(train_device, temp_device, debug_mode)
         case TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
                 return StableDiffusionEmbeddingSetup(train_device, temp_device, debug_mode)
@@ -424,6 +450,8 @@ def create_model_setup(
                 return HunyuanVideoEmbeddingSetup(train_device, temp_device, debug_mode)
             if model_type.is_hi_dream():
                 return HiDreamEmbeddingSetup(train_device, temp_device, debug_mode)
+            if model_type.is_wan():
+                return WanEmbeddingSetup(train_device, temp_device, debug_mode)
 
     return None
 
@@ -512,6 +540,8 @@ def create_data_loader(
                 return HunyuanVideoBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_hi_dream():
                 return HiDreamBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_wan():
+                return WanBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
