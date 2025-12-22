@@ -1,0 +1,38 @@
+{
+    "backup_after": 15,
+    "base_model_name": "wan-ai/WAN_2_2",
+    "batch_size": 1,
+    "gradient_checkpointing": "CPU_OFFLOADED",
+    "layer_offload_fraction": 0.8,
+    "dataloader_threads": 1,
+    "learning_rate": 0.0003,
+    "model_type": "WAN_2_2",
+    "output_model_destination": "models/wan_lora_8gb.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": "384",
+    "frames": 8,
+    "timestep_distribution": "LOGIT_NORMAL",
+    "train_dtype": "BFLOAT_16",
+    "training_method": "LORA",
+    "transformer": {
+        "train": true,
+        "weight_dtype": "NFLOAT_4"
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "NFLOAT_4"
+    },
+    "video_config": {
+        "max_frames": 8,
+        "frame_sample_strategy": "uniform",
+        "target_fps": 12.0,
+        "max_duration": 5.0,
+        "temporal_consistency_weight": 0.8,
+        "use_temporal_attention": true,
+        "spatial_compression_ratio": 16,
+        "temporal_compression_ratio": 8,
+        "video_batch_size_multiplier": 0.25,
+        "frame_dropout_probability": 0.0,
+        "temporal_augmentation": false
+    }
+}

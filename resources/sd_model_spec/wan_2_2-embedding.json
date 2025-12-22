@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "WAN-2.2/embedding",
+    "modelspec.implementation": "https://github.com/huggingface/diffusers",
+    "modelspec.title": "WAN 2.2 Embedding"
+}

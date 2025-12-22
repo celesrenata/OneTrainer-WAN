@@ -2,6 +2,7 @@ from modules.modelSetup.BaseChromaSetup import PRESETS as chroma_presets
 from modules.modelSetup.BaseFluxSetup import PRESETS as flux_presets
 from modules.modelSetup.BaseHiDreamSetup import PRESETS as hidream_presets
 from modules.modelSetup.BaseHunyuanVideoSetup import PRESETS as hunyuan_video_presets
+from modules.modelSetup.BaseWanSetup import PRESETS as wan_presets
 from modules.modelSetup.BasePixArtAlphaSetup import PRESETS as pixart_presets
 from modules.modelSetup.BaseQwenSetup import PRESETS as qwen_presets
 from modules.modelSetup.BaseSanaSetup import PRESETS as sana_presets
@@ -90,6 +91,8 @@ class TrainingTab:
             self.__setup_sana_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_hunyuan_video():
             self.__setup_hunyuan_video_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_wan():
+            self.__setup_wan_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_hi_dream():
             self.__setup_hi_dream_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_z_image():
@@ -238,6 +241,21 @@ class TrainingTab:
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
         self.__create_noise_frame(column_1, 2)
 
+        self.__create_video_config_frame(column_2, 0)
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
+
+    def __setup_wan_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_n_frame(column_0, 1, i=1, supports_include=True)
+        self.__create_embedding_frame(column_0, 2)
+
+        self.__create_base2_frame(column_1, 0, video_training_enabled=True)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
+        self.__create_noise_frame(column_1, 2)
+
+        self.__create_video_config_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
         self.__create_layer_frame(column_2, 3)
@@ -254,6 +272,7 @@ class TrainingTab:
         self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
+        self.__create_video_config_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
         self.__create_layer_frame(column_2, 3)
@@ -670,6 +689,51 @@ class TrainingTab:
 
 
 
+    def __create_video_config_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+
+        # Video Data Processing Parameters
+        components.label(frame, 0, 0, "Max Frames",
+                         tooltip="Maximum number of frames to use for training. Higher values require more memory.")
+        components.entry(frame, 0, 1, self.ui_state, "video_config.max_frames")
+
+        components.label(frame, 1, 0, "Frame Sample Strategy",
+                         tooltip="Strategy for sampling frames from videos: uniform (evenly spaced), random (randomly selected), keyframe (prefer keyframes)")
+        components.options(frame, 1, 1, ["uniform", "random", "keyframe"], self.ui_state, "video_config.frame_sample_strategy")
+
+        components.label(frame, 2, 0, "Target FPS",
+                         tooltip="Target frames per second for video processing")
+        components.entry(frame, 2, 1, self.ui_state, "video_config.target_fps")
+
+        components.label(frame, 3, 0, "Max Duration (seconds)",
+                         tooltip="Maximum duration of video clips to process")
+        components.entry(frame, 3, 1, self.ui_state, "video_config.max_duration")
+
+        # Temporal Consistency Parameters
+        components.label(frame, 4, 0, "Temporal Consistency Weight",
+                         tooltip="Weight for temporal consistency loss. Higher values enforce more consistency between frames.")
+        components.entry(frame, 4, 1, self.ui_state, "video_config.temporal_consistency_weight")
+
+        components.label(frame, 5, 0, "Use Temporal Attention",
+                         tooltip="Enable temporal attention mechanisms for better frame-to-frame consistency")
+        components.switch(frame, 5, 1, self.ui_state, "video_config.use_temporal_attention")
+
+        # Memory Management Parameters
+        components.label(frame, 6, 0, "Video Batch Size Multiplier",
+                         tooltip="Multiplier for batch size when processing video. Lower values reduce memory usage.")
+        components.entry(frame, 6, 1, self.ui_state, "video_config.video_batch_size_multiplier")
+
+        # Video-specific Training Parameters
+        components.label(frame, 7, 0, "Frame Dropout Probability",
+                         tooltip="Probability of dropping frames during training for regularization")
+        components.entry(frame, 7, 1, self.ui_state, "video_config.frame_dropout_probability")
+
+        components.label(frame, 8, 0, "Temporal Augmentation",
+                         tooltip="Enable temporal augmentations like frame shuffling and temporal cropping")
+        components.switch(frame, 8, 1, self.ui_state, "video_config.temporal_augmentation")
+
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -787,6 +851,8 @@ class TrainingTab:
             presets = sana_presets
         elif self.train_config.model_type.is_hunyuan_video():
             presets = hunyuan_video_presets
+        elif self.train_config.model_type.is_wan():
+            presets = wan_presets
         elif self.train_config.model_type.is_hi_dream():
             presets = hidream_presets
         elif self.train_config.model_type.is_z_image():

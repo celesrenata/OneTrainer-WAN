@@ -1,0 +1,38 @@
+{
+    "backup_after": 10,
+    "base_model_name": "wan-ai/WAN_2_2",
+    "batch_size": 4,
+    "gradient_checkpointing": "GRADIENT",
+    "dataloader_threads": 2,
+    "learning_rate": 0.001,
+    "embedding_learning_rate": 0.005,
+    "model_type": "WAN_2_2",
+    "output_model_destination": "models/wan_embedding.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": "512",
+    "frames": 16,
+    "timestep_distribution": "UNIFORM",
+    "train_dtype": "BFLOAT_16",
+    "training_method": "EMBEDDING",
+    "transformer": {
+        "train": false,
+        "weight_dtype": "FLOAT_8"
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "FLOAT_8"
+    },
+    "video_config": {
+        "max_frames": 16,
+        "frame_sample_strategy": "uniform",
+        "target_fps": 24.0,
+        "max_duration": 8.0,
+        "temporal_consistency_weight": 0.5,
+        "use_temporal_attention": true,
+        "spatial_compression_ratio": 8,
+        "temporal_compression_ratio": 4,
+        "video_batch_size_multiplier": 0.8,
+        "frame_dropout_probability": 0.1,
+        "temporal_augmentation": true
+    }
+}

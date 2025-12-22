@@ -1,0 +1,1 @@
+# Integration tests for OneTrainer WAN 2.2 components

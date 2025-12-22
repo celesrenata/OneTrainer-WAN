@@ -64,6 +64,7 @@ from modules.modelSampler.StableDiffusion3Sampler import StableDiffusion3Sampler
 from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
 from modules.modelSampler.StableDiffusionXLSampler import StableDiffusionXLSampler
+from modules.modelSampler.WanModelSampler import WanModelSampler
 from modules.modelSampler.WuerstchenSampler import WuerstchenSampler
 from modules.modelSampler.ZImageSampler import ZImageSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
@@ -460,6 +461,8 @@ def create_model_sampler(
                 return HunyuanVideoSampler(train_device, temp_device, model, model_type)
             if model_type.is_hi_dream():
                 return HiDreamSampler(train_device, temp_device, model, model_type)
+            if model_type.is_wan():
+                return WanModelSampler(train_device, temp_device, model, model_type)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
                 return StableDiffusionVaeSampler(train_device, temp_device, model, model_type)

@@ -38,6 +38,8 @@ class ModelType(Enum):
 
     Z_IMAGE = 'Z_IMAGE'
 
+    WAN_2_2 = 'WAN_2_2'
+
     def __str__(self):
         return self.value
 
@@ -98,6 +100,9 @@ class ModelType(Enum):
     def is_z_image(self):
         return self == ModelType.Z_IMAGE
 
+    def is_wan(self):
+        return self == ModelType.WAN_2_2
+
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
@@ -119,6 +124,7 @@ class ModelType(Enum):
             or self.is_flux() \
             or self.is_hunyuan_video() \
             or self.is_hi_dream() \
+            or self.is_wan()
 
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \
@@ -145,7 +151,8 @@ class ModelType(Enum):
             or self.is_qwen() \
             or self.is_sana() \
             or self.is_hunyuan_video() \
-            or self.is_hi_dream()
+            or self.is_hi_dream() \
+            or self.is_wan()
 
 
 class PeftType(Enum):

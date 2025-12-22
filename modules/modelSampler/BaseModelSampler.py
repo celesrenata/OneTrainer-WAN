@@ -95,6 +95,22 @@ class BaseModelSampler(metaclass=ABCMeta):
         elif sampler_output.file_type == FileType.VIDEO:
             if video_format is None:
                 raise ValueError("Video format required for sampling a video")
-            write_video(destination + video_format.extension(), options={"crf": "17"}, video_array=sampler_output.data, fps=24)
+            
+            if video_format.is_video_format():
+                # Save as actual video file
+                codec_options = video_format.codec_options()
+                write_video(
+                    destination + video_format.extension(), 
+                    options=codec_options,
+                    video_array=sampler_output.data, 
+                    fps=24
+                )
+            else:
+                # Save as image sequence
+                video_tensor = sampler_output.data
+                for i, frame in enumerate(video_tensor):
+                    frame_image = Image.fromarray(frame.numpy())
+                    frame_path = f"{destination}_frame_{i:04d}{video_format.extension()}"
+                    frame_image.save(frame_path, format=video_format.pil_format())
         elif sampler_output.file_type == FileType.AUDIO:
             pass # TODO

@@ -9,6 +9,7 @@ from modules.util.config.CloudConfig import CloudConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.SecretsConfig import SecretsConfig
+from modules.util.config.VideoConfig import VideoConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -31,6 +32,29 @@ from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.torch_util import default_device
 
+
+
+# WAN 2.2 Default Configuration Values
+WAN_2_2_DEFAULTS = {
+    'target_frames': 16,
+    'frame_sample_strategy': 'uniform',
+    'temporal_consistency_weight': 1.0,
+    'min_video_resolution': (256, 256),
+    'max_video_resolution': (1024, 1024),
+    'max_video_duration': 10.0,
+    'video_fps': 24,
+    'batch_size': 1,
+    'learning_rate': 1e-4,
+    'gradient_accumulation_steps': 4,
+    'max_epochs': 10,
+    'save_every_n_epochs': 2,
+    'sample_every_n_epochs': 1,
+    'gradient_checkpointing': True,
+    'mixed_precision': True,
+    'optimizer_type': 'AdamW',
+    'scheduler_type': 'cosine',
+    'warmup_steps': 100
+}
 
 class TrainOptimizerConfig(BaseConfig):
     optimizer: Optimizer
@@ -551,6 +575,9 @@ class TrainConfig(BaseConfig):
 
     # cloud settings
     cloud: CloudConfig
+
+    # video settings
+    video_config: 'VideoConfig'
 
     # backup settings
     backup_after: float
@@ -1143,6 +1170,9 @@ class TrainConfig(BaseConfig):
 
         # cloud
         data.append(("cloud", CloudConfig.default_values(), CloudConfig, False))
+
+        # video settings
+        data.append(("video_config", VideoConfig.default_values(), VideoConfig, False))
 
         # lora
         data.append(("peft_type", PeftType.LORA, PeftType, False))

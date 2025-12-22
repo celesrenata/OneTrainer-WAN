@@ -4,6 +4,7 @@ from modules.modelSetup.BaseChromaSetup import PRESETS as chroma_presets
 from modules.modelSetup.BaseFluxSetup import PRESETS as flux_presets
 from modules.modelSetup.BaseHiDreamSetup import PRESETS as hidream_presets
 from modules.modelSetup.BaseHunyuanVideoSetup import PRESETS as hunyuan_video_presets
+from modules.modelSetup.BaseWanSetup import PRESETS as wan_presets
 from modules.modelSetup.BasePixArtAlphaSetup import PRESETS as pixart_presets
 from modules.modelSetup.BaseQwenSetup import PRESETS as qwen_presets
 from modules.modelSetup.BaseSanaSetup import PRESETS as sana_presets
@@ -78,6 +79,8 @@ class ModelTab:
             self.__setup_sana_ui(base_frame)
         elif self.train_config.model_type.is_hunyuan_video():
             self.__setup_hunyuan_video_ui(base_frame)
+        elif self.train_config.model_type.is_wan():
+            self.__setup_wan_ui(base_frame)
         elif self.train_config.model_type.is_hi_dream():
             self.__setup_hi_dream_ui(base_frame)
 
@@ -295,6 +298,25 @@ class ModelTab:
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
+    def __setup_wan_ui(self, frame):
+        row = 0
+        row = self.__create_base_dtype_components(frame, row)
+        row = self.__create_base_components(
+            frame,
+            row,
+            has_transformer=True,
+            allow_override_transformer=True,
+            has_text_encoder_1=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            frame,
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+        )
+
     def __setup_hi_dream_ui(self, frame):
         row = 0
         row = self.__create_base_dtype_components(frame, row)
@@ -452,6 +474,8 @@ class ModelTab:
             presets = sana_presets
         elif self.train_config.model_type.is_hunyuan_video():
             presets = hunyuan_video_presets
+        elif self.train_config.model_type.is_wan():
+            presets = wan_presets
         elif self.train_config.model_type.is_z_image():
             presets = z_image_presets
         elif self.train_config.model_type.is_hi_dream():

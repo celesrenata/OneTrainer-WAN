@@ -7,7 +7,9 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 ## Features
 
 -   **Supported models**: Z-Image, Qwen Image, FLUX.1, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
-    PixArt-Alpha, PixArt-Sigma, Sana, Hunyuan Video and inpainting models
+    PixArt-Alpha, PixArt-Sigma, Sana, Hunyuan Video, WAN 2.2, HiDream and inpainting models
+-   **Video training**: Full support for video generation models including WAN 2.2, Hunyuan Video, and HiDream with temporal consistency optimization
+-   **GPU platform support**: CUDA (NVIDIA) and ROCm (AMD) acceleration with automatic detection and optimization
 -   **Model formats**: diffusers and ckpt models
 -   **Training methods**: Full fine-tuning, LoRA, embeddings
 -   **Masked Training**: Let the training focus on just certain parts of the samples
@@ -37,6 +39,25 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 > Installing OneTrainer requires Python >=3.10 and <3.13.
 > You can download Python at https://www.python.org/downloads/windows/.
 > Then follow the below steps.
+
+### Video Training Requirements
+
+For video model training (WAN 2.2, Hunyuan Video, HiDream), additional requirements apply:
+
+- **VRAM**: Minimum 8GB (with optimizations), 16GB+ recommended
+- **System RAM**: 16GB minimum, 32GB+ recommended for video processing
+- **Storage**: SSD recommended for video data loading performance
+- **Video dependencies**: Automatically installed with OneTrainer (OpenCV, FFmpeg)
+
+### GPU Platform Support
+
+OneTrainer supports multiple GPU platforms:
+
+- **NVIDIA GPUs**: Full CUDA support with automatic detection
+- **AMD GPUs**: ROCm support for compatible AMD GPUs (RX 6000+, RX 7000+, Radeon Pro, Instinct MI series)
+- **CPU**: Fallback support for development and testing (significantly slower)
+
+For AMD GPU setup, see the [WAN 2.2 Training Guide](docs/WAN22Training.md#gpu-platform-setup) for ROCm installation instructions.
 
 #### Automatic installation
 
@@ -82,7 +103,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 OneTrainer can be used in **two primary modes**: a graphical user interface (GUI) and a **command-line interface (CLI)** for finer control.
 
-For a technically focused quick start, see the [Quick Start Guide](docs/QuickStartGuide.md) and for a broader overview, see the [Overview documentation](docs/Overview.md). Otherwise visit [our wiki!](https://github.com/Nerogar/OneTrainer)
+For a technically focused quick start, see the [Quick Start Guide](docs/QuickStartGuide.md) and for a broader overview, see the [Overview documentation](docs/Overview.md). For video model training with WAN 2.2, see the [WAN 2.2 Training Guide](docs/WAN22Training.md). Otherwise visit [our wiki!](https://github.com/Nerogar/OneTrainer)
 
 ### GUI Mode
 
@@ -118,6 +139,8 @@ If you are on Mac or Linux, you can also read [the launch script documentation](
 ## Troubleshooting
 
 For general troubleshooting or questions, ask in [Discussions](https://github.com/Nerogar/OneTrainer/discussions), check the [Wiki](https://github.com/Nerogar/OneTrainer/wiki) or join our [Discord](https://discord.gg/KwgcQd5scF).
+
+For WAN 2.2 specific issues, see the [WAN 2.2 Troubleshooting Guide](docs/WAN22Troubleshooting.md).
 
 If you encounter a reproducible error you first must run update.bat or update.sh and confirm the issue is still able to be reproduced. Then export anonymized debug information to help us solve an issue you are facing and upload it as part of your Github Issues submission.
 
