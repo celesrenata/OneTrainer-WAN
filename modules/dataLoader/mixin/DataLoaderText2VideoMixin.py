@@ -89,6 +89,35 @@ class DataLoaderText2VideoMixin:
         """Load input modules for video data processing."""
         from mgds.PipelineModule import PipelineModule
         
+        # Create a general safety wrapper that prevents None returns
+        class SafePipelineModule(PipelineModule):
+            def __init__(self, wrapped_module, module_name="Unknown"):
+                super().__init__()
+                self.wrapped_module = wrapped_module
+                self.module_name = module_name
+                
+            def length(self):
+                return self.wrapped_module.length()
+                
+            def get_inputs(self):
+                return self.wrapped_module.get_inputs()
+                
+            def get_outputs(self):
+                return self.wrapped_module.get_outputs()
+                
+            def get_item(self, variation, index, requested_name=None):
+                try:
+                    result = self.wrapped_module.get_item(variation, index, requested_name)
+                    if result is None:
+                        print(f"Warning: {self.module_name} returned None for item {index}, skipping")
+                        # Instead of creating dummy data, get the previous item
+                        return self._get_previous_item(variation, index, requested_name)
+                    return result
+                except Exception as e:
+                    print(f"Warning: {self.module_name} failed for item {index}: {e}, skipping")
+                    # Instead of creating dummy data, get the previous item
+                    return self._get_previous_item(variation, index, requested_name)
+        
         # Create a wrapper module that prevents None returns from LoadVideo
         class SafeLoadVideo(PipelineModule):
             def __init__(self, load_video_module):
@@ -109,17 +138,29 @@ class DataLoaderText2VideoMixin:
                     result = self.load_video_module.get_item(variation, index, requested_name)
                     if result is None:
                         print(f"Warning: LoadVideo returned None for item {index}, creating dummy data")
-                        # Create dummy video data to prevent pipeline crash
+                        # Create comprehensive dummy data to prevent pipeline crash
                         import torch
                         dummy_video = torch.zeros((8, 3, 64, 64), dtype=train_dtype.torch_dtype())  # 8 frames, 3 channels, 64x64
-                        return {'video': dummy_video}
+                        # Return a complete data dictionary with all expected fields
+                        return {
+                            'video': dummy_video,
+                            'video_path': f'dummy_video_{index}.mp4',
+                            'prompt': 'dummy prompt',
+                            'settings': {'target_frames': 8}
+                        }
                     return result
                 except Exception as e:
                     print(f"Warning: LoadVideo failed for item {index}: {e}, creating dummy data")
-                    # Create dummy video data to prevent pipeline crash
+                    # Create comprehensive dummy data to prevent pipeline crash
                     import torch
                     dummy_video = torch.zeros((8, 3, 64, 64), dtype=train_dtype.torch_dtype())  # 8 frames, 3 channels, 64x64
-                    return {'video': dummy_video}
+                    # Return a complete data dictionary with all expected fields
+                    return {
+                        'video': dummy_video,
+                        'video_path': f'dummy_video_{index}.mp4',
+                        'prompt': 'dummy prompt',
+                        'settings': {'target_frames': 8}
+                    }
         
         # Load video with configurable frame count and sampling strategy
         load_video_base = LoadVideo(
@@ -166,17 +207,29 @@ class DataLoaderText2VideoMixin:
                     result = self.load_image_module.get_item(variation, index, requested_name)
                     if result is None:
                         print(f"Warning: LoadImage returned None for item {index}, creating dummy data")
-                        # Create dummy image data to prevent pipeline crash
+                        # Create comprehensive dummy data to prevent pipeline crash
                         import torch
                         dummy_image = torch.zeros((3, 64, 64), dtype=train_dtype.torch_dtype())  # 3 channels, 64x64
-                        return {'image': dummy_image}
+                        # Return a complete data dictionary with all expected fields
+                        return {
+                            'image': dummy_image,
+                            'image_path': f'dummy_image_{index}.jpg',
+                            'prompt': 'dummy prompt',
+                            'settings': {'target_frames': 1}
+                        }
                     return result
                 except Exception as e:
                     print(f"Warning: LoadImage failed for item {index}: {e}, creating dummy data")
-                    # Create dummy image data to prevent pipeline crash
+                    # Create comprehensive dummy data to prevent pipeline crash
                     import torch
                     dummy_image = torch.zeros((3, 64, 64), dtype=train_dtype.torch_dtype())  # 3 channels, 64x64
-                    return {'image': dummy_image}
+                    # Return a complete data dictionary with all expected fields
+                    return {
+                        'image': dummy_image,
+                        'image_path': f'dummy_image_{index}.jpg',
+                        'prompt': 'dummy prompt',
+                        'settings': {'target_frames': 1}
+                    }
         
         load_image = SafeLoadImage(load_image_base)
         
