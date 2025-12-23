@@ -42,17 +42,26 @@ class WanModelLoader(
                 # Input projection
                 self.input_proj = torch.nn.Linear(4, self.embed_dim, dtype=dtype)  # 4 channels for video latents
                 
-                # Transformer layers
-                self.layers = torch.nn.ModuleList([
-                    torch.nn.TransformerEncoderLayer(
-                        d_model=self.embed_dim,
-                        nhead=self.num_heads,
-                        dim_feedforward=self.embed_dim * 4,
-                        dropout=0.1,
-                        batch_first=True,
-                        dtype=dtype
-                    ) for _ in range(self.num_layers)
-                ])
+                # Transformer layers with proper naming for LoRA compatibility
+                self.layers = torch.nn.ModuleList()
+                for i in range(self.num_layers):
+                    layer = torch.nn.ModuleDict({
+                        'self_attn': torch.nn.MultiheadAttention(
+                            self.embed_dim, self.num_heads, batch_first=True, dtype=dtype
+                        ),
+                        'temporal_attn': torch.nn.MultiheadAttention(
+                            self.embed_dim, self.num_heads, batch_first=True, dtype=dtype
+                        ),
+                        'mlp': torch.nn.Sequential(
+                            torch.nn.Linear(self.embed_dim, self.embed_dim * 4, dtype=dtype),
+                            torch.nn.GELU(),
+                            torch.nn.Linear(self.embed_dim * 4, self.embed_dim, dtype=dtype)
+                        ),
+                        'norm1': torch.nn.LayerNorm(self.embed_dim, dtype=dtype),
+                        'norm2': torch.nn.LayerNorm(self.embed_dim, dtype=dtype),
+                        'norm3': torch.nn.LayerNorm(self.embed_dim, dtype=dtype)
+                    })
+                    self.layers.append(layer)
                 
                 # Output projection
                 self.output_proj = torch.nn.Linear(self.embed_dim, 4, dtype=dtype)  # Back to 4 channels
@@ -86,7 +95,20 @@ class WanModelLoader(
                 
                 # Apply transformer layers
                 for layer in self.layers:
-                    x = layer(x)
+                    # Self attention
+                    norm_x = layer['norm1'](x)
+                    attn_out, _ = layer['self_attn'](norm_x, norm_x, norm_x)
+                    x = x + attn_out
+                    
+                    # Temporal attention (for video)
+                    norm_x = layer['norm2'](x)
+                    temp_attn_out, _ = layer['temporal_attn'](norm_x, norm_x, norm_x)
+                    x = x + temp_attn_out
+                    
+                    # MLP
+                    norm_x = layer['norm3'](x)
+                    mlp_out = layer['mlp'](norm_x)
+                    x = x + mlp_out
                 
                 # Project output
                 x = self.output_proj(x)
