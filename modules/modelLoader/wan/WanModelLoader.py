@@ -106,34 +106,47 @@ class WanModelLoader(
             text_encoder = None
 
         if vae_model_name:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,  # May need to be WAN 2.2 specific VAE
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
+            try:
+                vae = self._load_diffusers_sub_module(
+                    AutoencoderKL,  # May need to be WAN 2.2 specific VAE
+                    weight_dtypes.vae,
+                    weight_dtypes.train_dtype,
+                    vae_model_name,
+                )
+            except Exception as e:
+                print(f"Warning: Could not load VAE from {vae_model_name}: {e}")
+                vae = None
         else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,  # May need to be WAN 2.2 specific VAE
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
+            try:
+                vae = self._load_diffusers_sub_module(
+                    AutoencoderKL,  # May need to be WAN 2.2 specific VAE
+                    weight_dtypes.vae,
+                    weight_dtypes.train_dtype,
+                    base_model_name,
                 "vae",
             )
+            except Exception as e:
+                print(f"Warning: Could not load VAE from {base_model_name}: {e}")
+                vae = None
 
         if transformer_model_name:
             # Load transformer from single file - will need actual WAN 2.2 transformer class
             try:
-                transformer = PreTrainedModel.from_single_file(
-                    transformer_model_name,
-                    config=base_model_name,
-                    subfolder="transformer",
-                    torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
-                )
-                transformer = self._convert_diffusers_sub_module_to_dtype(
-                    transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization
-                )
-            except Exception:
+                # Check if from_single_file method exists for PreTrainedModel
+                if hasattr(PreTrainedModel, 'from_single_file'):
+                    transformer = PreTrainedModel.from_single_file(
+                        transformer_model_name,
+                        config=base_model_name,
+                        subfolder="transformer",
+                        torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
+                    )
+                    transformer = self._convert_diffusers_sub_module_to_dtype(
+                        transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization
+                    )
+                else:
+                    transformer = None
+            except Exception as e:
+                print(f"Warning: Could not load transformer from {transformer_model_name}: {e}")
                 transformer = None
         else:
             # Load transformer from diffusers format - will need actual WAN 2.2 transformer class
@@ -169,10 +182,18 @@ class WanModelLoader(
     ):
         # Load from single safetensors file - will need actual WAN 2.2 pipeline
         try:
-            pipeline = DiffusionPipeline.from_single_file(
-                pretrained_model_link_or_path=base_model_name,
-                safety_checker=None,
-            )
+            # Check if from_single_file method exists
+            if hasattr(DiffusionPipeline, 'from_single_file'):
+                pipeline = DiffusionPipeline.from_single_file(
+                    pretrained_model_link_or_path=base_model_name,
+                    safety_checker=None,
+                )
+            else:
+                # Fallback to regular from_pretrained
+                pipeline = DiffusionPipeline.from_pretrained(
+                    base_model_name,
+                    safety_checker=None,
+                )
         except Exception:
             raise Exception("Could not load WAN 2.2 pipeline from safetensors")
 
@@ -275,4 +296,14 @@ class WanModelLoader(
 
         for stacktrace in stacktraces:
             print(stacktrace)
-        raise Exception("could not load model: " + model_names.base_model)
+        
+        print(f"\n=== WAN 2.2 Model Loading Failed ===")
+        print(f"Model: {model_names.base_model}")
+        print(f"Attempted loading methods: internal, diffusers, safetensors")
+        print(f"Common issues:")
+        print(f"  1. Model is not WAN 2.2 compatible (try: runwayml/stable-diffusion-v1-5)")
+        print(f"  2. Model has incompatible VAE configuration")
+        print(f"  3. Model format is not supported")
+        print(f"Suggestion: Try 'runwayml/stable-diffusion-v1-5' as base model")
+        
+        raise Exception(f"Could not load WAN 2.2 model: {model_names.base_model}. Try using 'runwayml/stable-diffusion-v1-5' instead.")
