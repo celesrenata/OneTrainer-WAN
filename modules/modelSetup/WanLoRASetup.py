@@ -72,8 +72,10 @@ class WanLoRASetup(
         # Freeze base model parameters for memory efficiency
         if model.text_encoder is not None:
             model.text_encoder.requires_grad_(False)
-        model.transformer.requires_grad_(False)
-        model.vae.requires_grad_(False)
+        if model.transformer is not None:
+            model.transformer.requires_grad_(False)
+        if model.vae is not None:
+            model.vae.requires_grad_(False)
 
         # Enable gradients for LoRA adapters
         self._setup_model_part_requires_grad(
@@ -106,7 +108,7 @@ class WanLoRASetup(
         
         # Enable gradient checkpointing for memory efficiency if available
         if config.gradient_checkpointing.enabled():
-            if hasattr(model.transformer, 'gradient_checkpointing_enable'):
+            if model.transformer is not None and hasattr(model.transformer, 'gradient_checkpointing_enable'):
                 model.transformer.gradient_checkpointing_enable()
                 print("Enabled gradient checkpointing for transformer")
         
@@ -151,15 +153,20 @@ class WanLoRASetup(
             if not layer_filter or layer_filter == [""]:
                 layer_filter = ["attn", "temporal_attn"]  # Default to attention layers
         
-        model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, layer_filter
-        )
+        if model.transformer is not None:
+            model.transformer_lora = LoRAModuleWrapper(
+                model.transformer, "lora_transformer", config, layer_filter
+            )
+        else:
+            print("Warning: transformer is None, cannot create LoRA adapter")
+            model.transformer_lora = None
 
         # Load LoRA state dict if available
         if model.lora_state_dict:
             if model.text_encoder_lora is not None:
                 model.text_encoder_lora.load_state_dict(model.lora_state_dict)
-            model.transformer_lora.load_state_dict(model.lora_state_dict)
+            if model.transformer_lora is not None:
+                model.transformer_lora.load_state_dict(model.lora_state_dict)
             model.lora_state_dict = None
 
         # Setup text encoder LoRA
@@ -169,9 +176,10 @@ class WanLoRASetup(
             model.text_encoder_lora.hook_to_module()
 
         # Setup transformer LoRA with video optimizations
-        model.transformer_lora.set_dropout(config.dropout_probability)
-        model.transformer_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
-        model.transformer_lora.hook_to_module()
+        if model.transformer_lora is not None:
+            model.transformer_lora.set_dropout(config.dropout_probability)
+            model.transformer_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
+            model.transformer_lora.hook_to_module()
 
         # Setup embedding dtype if training embeddings
         if config.train_any_embedding():
@@ -179,7 +187,10 @@ class WanLoRASetup(
                 model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         # Setup tokenizer, embeddings and embedding wrapper
-        model.tokenizer = copy.deepcopy(model.orig_tokenizer)
+        if hasattr(model, 'orig_tokenizer') and model.orig_tokenizer is not None:
+            model.tokenizer = copy.deepcopy(model.orig_tokenizer)
+        else:
+            model.tokenizer = None
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
         
@@ -215,7 +226,8 @@ class WanLoRASetup(
         # Move components to appropriate devices
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.transformer_to(self.train_device)
+        if model.transformer is not None:
+            model.transformer_to(self.train_device)
 
         # Set training/eval modes
         if model.text_encoder:
@@ -225,13 +237,16 @@ class WanLoRASetup(
                 model.text_encoder.eval()
 
         # VAE is always in eval mode
-        model.vae.eval()
+        if model.vae is not None:
+            model.vae.eval()
 
         # Set transformer mode
         if config.transformer.train:
-            model.transformer.train()
+            if model.transformer is not None:
+                model.transformer.train()
         else:
-            model.transformer.eval()
+            if model.transformer is not None:
+                model.transformer.eval()
 
     def after_optimizer_step(
             self,
