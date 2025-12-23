@@ -151,7 +151,7 @@ class WanBaseDataLoader(
         add_embeddings_to_prompt = MapData(
             in_name='prompt', 
             out_name='prompt_with_embeddings', 
-            map_fn=model.add_embeddings_to_prompt
+            map_fn=model.add_text_encoder_embeddings_to_prompt
         )
         
         # Encode text using WAN-specific video text encoder

@@ -127,9 +127,15 @@ class WanModel(BaseModel):
 
         self.text_encoder_autocast_context = nullcontext()
         self.transformer_autocast_context = nullcontext()
+        
+        # General autocast context (will be set by model setup)
+        self.autocast_context = nullcontext()
 
         self.text_encoder_train_dtype = DataType.FLOAT_32
         self.transformer_train_dtype = DataType.FLOAT_32
+        
+        # General train dtype (will be set by model setup)
+        self.train_dtype = DataType.FLOAT_32
 
         self.text_encoder_offload_conductor = None
         self.transformer_offload_conductor = None
