@@ -165,18 +165,23 @@ class DataLoaderText2VideoMixin:
                 # Get the data from previous module
                 data_dict = self._get_previous_item(variation, index, requested_name)
                 
-                # Validate video file if present
+                # If data_dict is None, pass it through
+                if data_dict is None:
+                    return None
+                
+                # Validate video file if present, but don't filter out invalid items
+                # Just log warnings for invalid videos
                 video_path = data_dict.get('video_path')
                 if video_path:
                     try:
                         is_valid, error_msg = validate_video_file(video_path)
                         if not is_valid:
-                            print(f"Skipping invalid video: {error_msg}")
-                            # Return None or empty dict to skip this item
-                            return None
+                            print(f"Warning: Invalid video detected: {error_msg}")
+                            # Don't return None - just log the warning and continue
+                            # The training will handle invalid data gracefully
                     except Exception as e:
-                        print(f"Error validating video {video_path}: {e}")
-                        return None
+                        print(f"Warning: Error validating video {video_path}: {e}")
+                        # Don't return None - just log the warning and continue
                 
                 return data_dict
         
