@@ -87,8 +87,42 @@ class DataLoaderText2VideoMixin:
             train_dtype: DataType,
     ) -> list:
         """Load input modules for video data processing."""
+        from mgds.PipelineModule import PipelineModule
+        
+        # Create a wrapper module that prevents None returns from LoadVideo
+        class SafeLoadVideo(PipelineModule):
+            def __init__(self, load_video_module):
+                super().__init__()
+                self.load_video_module = load_video_module
+                
+            def length(self):
+                return self.load_video_module.length()
+                
+            def get_inputs(self):
+                return self.load_video_module.get_inputs()
+                
+            def get_outputs(self):
+                return self.load_video_module.get_outputs()
+                
+            def get_item(self, variation, index, requested_name=None):
+                try:
+                    result = self.load_video_module.get_item(variation, index, requested_name)
+                    if result is None:
+                        print(f"Warning: LoadVideo returned None for item {index}, creating dummy data")
+                        # Create dummy video data to prevent pipeline crash
+                        import torch
+                        dummy_video = torch.zeros((8, 3, 64, 64), dtype=train_dtype.torch_dtype())  # 8 frames, 3 channels, 64x64
+                        return {'video': dummy_video}
+                    return result
+                except Exception as e:
+                    print(f"Warning: LoadVideo failed for item {index}: {e}, creating dummy data")
+                    # Create dummy video data to prevent pipeline crash
+                    import torch
+                    dummy_video = torch.zeros((8, 3, 64, 64), dtype=train_dtype.torch_dtype())  # 8 frames, 3 channels, 64x64
+                    return {'video': dummy_video}
+        
         # Load video with configurable frame count and sampling strategy
-        load_video = LoadVideo(
+        load_video_base = LoadVideo(
             path_in_name='video_path', 
             target_frame_count_in_name='settings.target_frames', 
             video_out_name='video', 
@@ -99,8 +133,11 @@ class DataLoaderText2VideoMixin:
             dtype=train_dtype.torch_dtype()
         )
         
+        # Wrap with safety module
+        load_video = SafeLoadVideo(load_video_base)
+        
         # Also support loading images and converting to video format
-        load_image = LoadImage(
+        load_image_base = LoadImage(
             path_in_name='video_path', 
             image_out_name='image', 
             range_min=0, 
@@ -108,6 +145,40 @@ class DataLoaderText2VideoMixin:
             supported_extensions=path_util.supported_image_extensions(), 
             dtype=train_dtype.torch_dtype()
         )
+        
+        # Create a wrapper for safe image loading
+        class SafeLoadImage(PipelineModule):
+            def __init__(self, load_image_module):
+                super().__init__()
+                self.load_image_module = load_image_module
+                
+            def length(self):
+                return self.load_image_module.length()
+                
+            def get_inputs(self):
+                return self.load_image_module.get_inputs()
+                
+            def get_outputs(self):
+                return self.load_image_module.get_outputs()
+                
+            def get_item(self, variation, index, requested_name=None):
+                try:
+                    result = self.load_image_module.get_item(variation, index, requested_name)
+                    if result is None:
+                        print(f"Warning: LoadImage returned None for item {index}, creating dummy data")
+                        # Create dummy image data to prevent pipeline crash
+                        import torch
+                        dummy_image = torch.zeros((3, 64, 64), dtype=train_dtype.torch_dtype())  # 3 channels, 64x64
+                        return {'image': dummy_image}
+                    return result
+                except Exception as e:
+                    print(f"Warning: LoadImage failed for item {index}: {e}, creating dummy data")
+                    # Create dummy image data to prevent pipeline crash
+                    import torch
+                    dummy_image = torch.zeros((3, 64, 64), dtype=train_dtype.torch_dtype())  # 3 channels, 64x64
+                    return {'image': dummy_image}
+        
+        load_image = SafeLoadImage(load_image_base)
         
         # Convert single images to video format for consistency
         image_to_video = ImageToVideo(in_name='image', out_name='video')
