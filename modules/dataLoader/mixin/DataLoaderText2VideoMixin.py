@@ -120,9 +120,10 @@ class DataLoaderText2VideoMixin:
         
         # Create a wrapper module that prevents None returns from LoadVideo
         class SafeLoadVideo(PipelineModule):
-            def __init__(self, load_video_module):
+            def __init__(self, load_video_module, dtype=torch.float32):
                 super().__init__()
                 self.load_video_module = load_video_module
+                self.dtype = dtype
                 
             def length(self):
                 return self.load_video_module.length()
@@ -140,7 +141,7 @@ class DataLoaderText2VideoMixin:
                         print(f"Warning: LoadVideo returned None for item {index}, creating dummy data")
                         # Create comprehensive dummy data to prevent pipeline crash
                         import torch
-                        dummy_video = torch.zeros((8, 3, 64, 64), dtype=train_dtype.torch_dtype())  # 8 frames, 3 channels, 64x64
+                        dummy_video = torch.zeros((8, 3, 64, 64), dtype=self.dtype)  # 8 frames, 3 channels, 64x64
                         # Return a complete data dictionary with all expected fields
                         return {
                             'video': dummy_video,
@@ -153,7 +154,7 @@ class DataLoaderText2VideoMixin:
                     print(f"Warning: LoadVideo failed for item {index}: {e}, creating dummy data")
                     # Create comprehensive dummy data to prevent pipeline crash
                     import torch
-                    dummy_video = torch.zeros((8, 3, 64, 64), dtype=train_dtype.torch_dtype())  # 8 frames, 3 channels, 64x64
+                    dummy_video = torch.zeros((8, 3, 64, 64), dtype=self.dtype)  # 8 frames, 3 channels, 64x64
                     # Return a complete data dictionary with all expected fields
                     return {
                         'video': dummy_video,
@@ -175,7 +176,7 @@ class DataLoaderText2VideoMixin:
         )
         
         # Wrap with safety module
-        load_video = SafeLoadVideo(load_video_base)
+        load_video = SafeLoadVideo(load_video_base, dtype=train_dtype.torch_dtype())
         
         # Also support loading images and converting to video format
         load_image_base = LoadImage(
@@ -189,9 +190,10 @@ class DataLoaderText2VideoMixin:
         
         # Create a wrapper for safe image loading
         class SafeLoadImage(PipelineModule):
-            def __init__(self, load_image_module):
+            def __init__(self, load_image_module, dtype=torch.float32):
                 super().__init__()
                 self.load_image_module = load_image_module
+                self.dtype = dtype
                 
             def length(self):
                 return self.load_image_module.length()
@@ -209,7 +211,7 @@ class DataLoaderText2VideoMixin:
                         print(f"Warning: LoadImage returned None for item {index}, creating dummy data")
                         # Create comprehensive dummy data to prevent pipeline crash
                         import torch
-                        dummy_image = torch.zeros((3, 64, 64), dtype=train_dtype.torch_dtype())  # 3 channels, 64x64
+                        dummy_image = torch.zeros((3, 64, 64), dtype=self.dtype)  # 3 channels, 64x64
                         # Return a complete data dictionary with all expected fields
                         return {
                             'image': dummy_image,
@@ -222,7 +224,7 @@ class DataLoaderText2VideoMixin:
                     print(f"Warning: LoadImage failed for item {index}: {e}, creating dummy data")
                     # Create comprehensive dummy data to prevent pipeline crash
                     import torch
-                    dummy_image = torch.zeros((3, 64, 64), dtype=train_dtype.torch_dtype())  # 3 channels, 64x64
+                    dummy_image = torch.zeros((3, 64, 64), dtype=self.dtype)  # 3 channels, 64x64
                     # Return a complete data dictionary with all expected fields
                     return {
                         'image': dummy_image,
@@ -231,7 +233,7 @@ class DataLoaderText2VideoMixin:
                         'settings': {'target_frames': 1}
                     }
         
-        load_image = SafeLoadImage(load_image_base)
+        load_image = SafeLoadImage(load_image_base, dtype=train_dtype.torch_dtype())
         
         # Convert single images to video format for consistency
         image_to_video = ImageToVideo(in_name='image', out_name='video')
