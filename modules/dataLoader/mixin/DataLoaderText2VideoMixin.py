@@ -145,24 +145,46 @@ class DataLoaderText2VideoMixin:
 
     def _video_validation_modules(self, config: TrainConfig) -> list:
         """Video validation modules to ensure data quality."""
-        from mgds.pipelineModules.FilterByFunction import FilterByFunction
+        # Create a custom validation module since FilterByFunction is not available
+        from mgds.PipelineModule import PipelineModule
         
-        def validate_video_path(data_dict):
-            """Validate video file before processing."""
-            video_path = data_dict.get('video_path')
-            if video_path:
-                is_valid, error_msg = validate_video_file(video_path)
-                if not is_valid:
-                    print(f"Skipping invalid video: {error_msg}")
-                    return False
-            return True
+        class VideoValidationModule(PipelineModule):
+            def __init__(self):
+                super().__init__()
+                
+            def length(self):
+                return self._get_previous_length()
+                
+            def get_inputs(self):
+                return []
+                
+            def get_outputs(self):
+                return []
+                
+            def get_item(self, variation, index, requested_name=None):
+                # Get the data from previous module
+                data_dict = self._get_previous_item(variation, index, requested_name)
+                
+                # Validate video file if present
+                video_path = data_dict.get('video_path')
+                if video_path:
+                    try:
+                        is_valid, error_msg = validate_video_file(video_path)
+                        if not is_valid:
+                            print(f"Skipping invalid video: {error_msg}")
+                            # Return None or empty dict to skip this item
+                            return None
+                    except Exception as e:
+                        print(f"Error validating video {video_path}: {e}")
+                        return None
+                
+                return data_dict
         
-        video_filter = FilterByFunction(
-            function=validate_video_path,
-            function_name='validate_video_file'
-        )
-        
-        return [video_filter]
+        # Only return validation module if video validation is needed
+        if hasattr(config, 'validate_video_files') and config.validate_video_files:
+            return [VideoValidationModule()]
+        else:
+            return []
 
     def _video_augmentation_modules(self, config: TrainConfig) -> list:
         """Video-specific augmentation modules."""
