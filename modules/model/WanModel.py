@@ -270,13 +270,50 @@ class WanModel(BaseModel):
 
     def create_pipeline(self) -> DiffusionPipeline:
         """Create inference pipeline for WAN 2.2"""
-        # This will need to be implemented with the actual WAN 2.2 pipeline when available
-        # For now, return a placeholder that follows the pattern
+        # Create a mock pipeline that works with our components
         from diffusers import DiffusionPipeline
         
-        # This is a placeholder - actual WAN 2.2 pipeline will be different
-        return DiffusionPipeline.from_pretrained(
-            "placeholder",  # Will be replaced with actual WAN 2.2 model path
+        # Create a custom pipeline class that works with our mock components
+        class MockWanPipeline(DiffusionPipeline):
+            def __init__(self, transformer, scheduler, vae, text_encoder, tokenizer):
+                super().__init__()
+                self.transformer = transformer
+                self.scheduler = scheduler
+                self.vae = vae
+                self.text_encoder = text_encoder
+                self.tokenizer = tokenizer
+                
+                # Add video processor for compatibility
+                self.video_processor = None  # Will be set if needed
+                
+            def __call__(self, prompt, **kwargs):
+                # Mock implementation for sampling
+                # This will be replaced with actual WAN 2.2 pipeline logic
+                import torch
+                
+                # Return a dummy tensor for now
+                batch_size = kwargs.get('batch_size', 1)
+                height = kwargs.get('height', 512)
+                width = kwargs.get('width', 512)
+                frames = kwargs.get('frames', 8)
+                
+                # Create dummy video output
+                dummy_video = torch.randn(batch_size, frames, 3, height, width)
+                
+                return {"videos": dummy_video}
+                
+            def to(self, device):
+                """Move pipeline to device"""
+                if self.transformer is not None:
+                    self.transformer.to(device)
+                if self.vae is not None:
+                    self.vae.to(device)
+                if self.text_encoder is not None:
+                    self.text_encoder.to(device)
+                return self
+        
+        # Return the mock pipeline with our components
+        return MockWanPipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
