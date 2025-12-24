@@ -115,6 +115,15 @@ class DataLoaderText2VideoMixin:
     ) -> list:
         """Load input modules for video data processing."""
         from mgds.PipelineModule import PipelineModule
+        from mgds.pipelineModules.LoadVideo import LoadVideo
+        from mgds.pipelineModules.LoadImage import LoadImage
+        from mgds.pipelineModules.ImageToVideo import ImageToVideo
+        from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
+        from mgds.pipelineModules.GetFilename import GetFilename
+        from mgds.pipelineModules.SelectInput import SelectInput
+        from mgds.pipelineModules.SelectRandomText import SelectRandomText
+        from modules.util import path_util
+        import torch
         
         # Create a safety wrapper that ensures we never return None from any module
         class SafePipelineModule(PipelineModule):
@@ -391,6 +400,63 @@ class DataLoaderText2VideoMixin:
                     print(f"Warning: LoadImage failed for item {index}: {e}, creating dummy data")
                     # Create comprehensive dummy data to prevent pipeline crash
                     import torch
+                    dummy_image = torch.zeros((3, 64, 64), dtype=self.dtype)  # 3 channels, 64x64
+                    return {
+                        'image': dummy_image,
+                        'image_path': f'dummy_image_{index}.jpg',
+                        'prompt': 'dummy prompt',
+                        'settings': {'target_frames': 1}
+                    }
+        
+        # Convert image to video format for consistency
+        image_to_video = ImageToVideo(image_in_name='image', video_out_name='video', frame_count=8)
+        
+        # Text loading modules
+        load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
+        load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
+        filename_prompt = GetFilename(path_in_name='video_path', filename_out_name='filename_prompt', include_extension=False)
+        select_prompt_input = SelectInput(setting_name='concept.text.prompt_source', out_name='prompts', setting_to_in_name_map={
+            'sample': 'sample_prompts',
+            'concept': 'concept_prompts',
+            'filename': 'filename_prompt',
+        }, default_in_name='sample_prompts')
+        select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
+
+        # Conditional image loading for custom conditioning
+        load_cond_image = LoadImage(path_in_name='cond_path', image_out_name='custom_conditioning_image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
+
+        modules = [load_video, load_image, image_to_video, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
+
+        if config.masked_training:
+            modules.append(generate_mask)
+            modules.append(load_mask)
+            modules.append(mask_to_video)
+        elif config.model_type.has_mask_input():
+            modules.append(generate_mask)
+
+        if config.custom_conditioning_image:
+            modules.append(load_cond_image)
+
+        # Wrap critical modules with safety wrapper to prevent None returns
+        print(f"DEBUG: Wrapping {len(modules)} modules with safety wrapper")
+        safe_modules = []
+        for i, module in enumerate(modules):
+            module_name = f"{type(module).__name__}_{i}"
+            print(f"DEBUG: Processing module {i}: {module_name}")
+            if hasattr(module, 'get_item'):  # Only wrap actual pipeline modules
+                print(f"DEBUG: Wrapping module {module_name} with SafePipelineModule")
+                safe_module = SafePipelineModule(
+                    module, 
+                    module_name=module_name,
+                    dtype=train_dtype.torch_dtype()
+                )
+                safe_modules.append(safe_module)
+            else:
+                print(f"DEBUG: Module {module_name} does not have get_item, adding as-is")
+                safe_modules.append(module)
+
+        print(f"DEBUG: Created {len(safe_modules)} safe modules")
+        return safe_modules
 
 # DEBUG: MGDS Module Debugging Wrapper
 import functools
@@ -448,51 +514,6 @@ try:
     print("DEBUG: Added debugging to CollectPaths")
 except ImportError:
     print("DEBUG: Could not import CollectPaths for debugging")
-
-        load_cond_image = LoadImage(path_in_name='cond_path', image_out_name='custom_conditioning_image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
-
-        load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
-        load_concept_prompts = LoadMultipleTexts(path_in_name='concept.text.prompt_path', texts_out_name='concept_prompts')
-        filename_prompt = GetFilename(path_in_name='video_path', filename_out_name='filename_prompt', include_extension=False)
-        select_prompt_input = SelectInput(setting_name='concept.text.prompt_source', out_name='prompts', setting_to_in_name_map={
-            'sample': 'sample_prompts',
-            'concept': 'concept_prompts',
-            'filename': 'filename_prompt',
-        }, default_in_name='sample_prompts')
-        select_random_text = SelectRandomText(texts_in_name='prompts', text_out_name='prompt')
-
-        modules = [load_video, load_image, image_to_video, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
-
-        if config.masked_training:
-            modules.append(generate_mask)
-            modules.append(load_mask)
-            modules.append(mask_to_video)
-        elif config.model_type.has_mask_input():
-            modules.append(generate_mask)
-
-        if config.custom_conditioning_image:
-            modules.append(load_cond_image)
-
-        # Wrap critical modules with safety wrapper to prevent None returns
-        print(f"DEBUG: Wrapping {len(modules)} modules with safety wrapper")
-        safe_modules = []
-        for i, module in enumerate(modules):
-            module_name = f"{type(module).__name__}_{i}"
-            print(f"DEBUG: Processing module {i}: {module_name}")
-            if hasattr(module, 'get_item'):  # Only wrap actual pipeline modules
-                print(f"DEBUG: Wrapping module {module_name} with SafePipelineModule")
-                safe_module = SafePipelineModule(
-                    module, 
-                    module_name=module_name,
-                    dtype=train_dtype.torch_dtype()
-                )
-                safe_modules.append(safe_module)
-            else:
-                print(f"DEBUG: Module {module_name} does not have get_item, adding as-is")
-                safe_modules.append(module)
-
-        print(f"DEBUG: Created {len(safe_modules)} safe modules")
-        return safe_modules
 
     def _video_validation_modules(self, config: TrainConfig) -> list:
         """Video validation modules to ensure data quality."""
