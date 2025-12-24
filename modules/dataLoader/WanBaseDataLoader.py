@@ -296,6 +296,7 @@ class WanBaseDataLoader(
         return self._video_output_modules_from_out_names(
             output_names=output_names,
             config=config,
+            model=model,
             before_cache_video_fun=before_cache_video_fun,
             use_conditioning_image=True,
             vae=model.vae,
