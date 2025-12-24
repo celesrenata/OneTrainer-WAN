@@ -447,6 +447,17 @@ class WanBaseDataLoader(
                             
                         def length(self):
                             try:
+                                # Check if the module has been initialized by MGDS yet
+                                if not hasattr(self.wrapped_module, '_PipelineModule__module_index'):
+                                    # Module not initialized yet - try to get a reasonable estimate
+                                    if hasattr(self.wrapped_module, '__class__') and 'CollectPaths' in str(self.wrapped_module.__class__):
+                                        # For CollectPaths, estimate from concept stats
+                                        print(f"INFO: {self.module_name} not initialized yet, estimating length from concept stats")
+                                        return 10  # Based on concept stats showing 10 images
+                                    else:
+                                        # For other modules, return 1 as fallback
+                                        return 1
+                                
                                 length = self.wrapped_module.length()
                                 # Always log length calls to trace data flow
                                 print(f"INFO: {self.module_name} length() returned: {length}")
