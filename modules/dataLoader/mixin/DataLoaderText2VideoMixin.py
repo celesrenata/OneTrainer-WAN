@@ -409,7 +409,7 @@ class DataLoaderText2VideoMixin:
                     }
         
         # Convert image to video format for consistency
-        image_to_video = ImageToVideo(image_in_name='image', video_out_name='video', frame_count=8)
+        image_to_video = ImageToVideo(in_name='image', out_name='video')
         
         # Text loading modules
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
