@@ -99,8 +99,11 @@ class DataLoaderText2VideoMixin:
                 
             def length(self):
                 try:
-                    return self.wrapped_module.length()
-                except:
+                    length = self.wrapped_module.length()
+                    print(f"INFO: {self.module_name} length() returned: {length}")
+                    return length
+                except Exception as e:
+                    print(f"WARNING: {self.module_name} length() failed: {e}, returning fallback length 1")
                     return 1  # Minimum length to prevent empty dataset
                 
             def get_inputs(self):
@@ -150,7 +153,7 @@ class DataLoaderText2VideoMixin:
             
             def clear_item_cache(self):
                 """Clear item cache - required by MGDS pipeline"""
-                print(f"DEBUG: {self.module_name} clear_item_cache called")
+                # Reduce debug noise - only log errors, not every call
                 
                 # First call the parent class method to initialize __local_cache
                 super().clear_item_cache()
@@ -160,10 +163,11 @@ class DataLoaderText2VideoMixin:
                     if hasattr(self.wrapped_module, 'clear_item_cache'):
                         return self.wrapped_module.clear_item_cache()
                     else:
-                        print(f"DEBUG: {self.module_name} wrapped module has no clear_item_cache method, skipping")
+                        # Only log if we need to debug specific modules
+                        pass
                         return None
                 except Exception as e:
-                    print(f"DEBUG: {self.module_name} clear_item_cache failed: {e}")
+                    print(f"ERROR: {self.module_name} clear_item_cache failed: {e}")
                     return None
                 
             def get_item(self, variation, index, requested_name=None):
