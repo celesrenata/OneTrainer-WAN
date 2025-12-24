@@ -823,7 +823,10 @@ class TrainConfig(BaseConfig):
         replace_dtype("decoder")
         replace_dtype("decoder_text_encoder")
         replace_dtype("decoder_vqgan")
-        migrated_data.pop("weight_dtype")
+        
+        # Only remove weight_dtype if it exists
+        if "weight_dtype" in migrated_data:
+            migrated_data.pop("weight_dtype")
 
         return migrated_data
 
