@@ -533,6 +533,11 @@ class WanModelLoader(
                     'max_position_embeddings': 512
                 })()
                 
+                # Create the expected structure: text_model.embeddings.token_embedding
+                self.text_model = type('TextModel', (), {})()
+                self.text_model.embeddings = type('Embeddings', (), {})()
+                self.text_model.embeddings.token_embedding = nn.Embedding(30522, 2048)  # BERT vocab size
+                
             def forward(self, input_ids, attention_mask=None):
                 B, seq_len = input_ids.shape
                 return type('Output', (), {
