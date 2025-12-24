@@ -30,6 +30,7 @@ from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
 from mgds.pipelineModules.RandomContrast import RandomContrast
 from mgds.pipelineModules.RandomFlip import RandomFlip
+from mgds.pipelineModules.RandomGamma import RandomGamma
 from mgds.pipelineModules.RandomHue import RandomHue
 from mgds.pipelineModules.RandomLatentMaskRemove import RandomLatentMaskRemove
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
