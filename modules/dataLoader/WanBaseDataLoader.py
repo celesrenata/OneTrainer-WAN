@@ -452,6 +452,45 @@ class WanBaseDataLoader(
                             
                         def get_outputs(self):
                             return self.wrapped_module.get_outputs()
+                        
+                        def init(self, pipeline, seed, index, state):
+                            """Initialize the module - required by MGDS pipeline"""
+                            print(f"DEBUG: {self.module_name} init called - seed={seed}, index={index}")
+                            try:
+                                if hasattr(self.wrapped_module, 'init'):
+                                    return self.wrapped_module.init(pipeline, seed, index, state)
+                                else:
+                                    print(f"DEBUG: {self.module_name} wrapped module has no init method, skipping")
+                                    return None
+                            except Exception as e:
+                                print(f"DEBUG: {self.module_name} init failed: {e}")
+                                return None
+                        
+                        def start(self, epoch):
+                            """Start epoch - required by some MGDS modules"""
+                            print(f"DEBUG: {self.module_name} start called - epoch={epoch}")
+                            try:
+                                if hasattr(self.wrapped_module, 'start'):
+                                    return self.wrapped_module.start(epoch)
+                                else:
+                                    print(f"DEBUG: {self.module_name} wrapped module has no start method, skipping")
+                                    return None
+                            except Exception as e:
+                                print(f"DEBUG: {self.module_name} start failed: {e}")
+                                return None
+                        
+                        def end(self):
+                            """End processing - required by some MGDS modules"""
+                            print(f"DEBUG: {self.module_name} end called")
+                            try:
+                                if hasattr(self.wrapped_module, 'end'):
+                                    return self.wrapped_module.end()
+                                else:
+                                    print(f"DEBUG: {self.module_name} wrapped module has no end method, skipping")
+                                    return None
+                            except Exception as e:
+                                print(f"DEBUG: {self.module_name} end failed: {e}")
+                                return None
                             
                         def get_item(self, variation, index, requested_name=None):
                             print(f"DEBUG: {self.module_name} get_item called - variation={variation}, index={index}, requested_name={requested_name}")

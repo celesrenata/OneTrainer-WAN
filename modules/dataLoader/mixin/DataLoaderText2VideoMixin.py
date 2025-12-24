@@ -147,35 +147,6 @@ class DataLoaderText2VideoMixin:
                 except Exception as e:
                     print(f"DEBUG: {self.module_name} end failed: {e}")
                     return None
-                except Exception as e:
-                    print(f"DEBUG: {self.module_name} init failed: {e}, continuing")
-                    return None
-            
-            def start(self, epoch):
-                """Start epoch - may be required by MGDS pipeline"""
-                print(f"DEBUG: {self.module_name} start called - epoch={epoch}")
-                try:
-                    if hasattr(self.wrapped_module, 'start'):
-                        return self.wrapped_module.start(epoch)
-                    else:
-                        print(f"DEBUG: {self.module_name} wrapped module has no start method, skipping")
-                        return None
-                except Exception as e:
-                    print(f"DEBUG: {self.module_name} start failed: {e}, continuing")
-                    return None
-            
-            def end_epoch(self):
-                """End epoch - may be required by MGDS pipeline"""
-                print(f"DEBUG: {self.module_name} end_epoch called")
-                try:
-                    if hasattr(self.wrapped_module, 'end_epoch'):
-                        return self.wrapped_module.end_epoch()
-                    else:
-                        print(f"DEBUG: {self.module_name} wrapped module has no end_epoch method, skipping")
-                        return None
-                except Exception as e:
-                    print(f"DEBUG: {self.module_name} end_epoch failed: {e}, continuing")
-                    return None
                 
             def get_item(self, variation, index, requested_name=None):
                 print(f"DEBUG: {self.module_name} get_item called - variation={variation}, index={index}, requested_name={requested_name}")
