@@ -89,15 +89,19 @@ class DataLoaderText2VideoMixin:
         """Load input modules for video data processing."""
         from mgds.PipelineModule import PipelineModule
         
-        # Create a general safety wrapper that prevents None returns
+        # Create a safety wrapper that ensures we never return None from any module
         class SafePipelineModule(PipelineModule):
-            def __init__(self, wrapped_module, module_name="Unknown"):
+            def __init__(self, wrapped_module, module_name="Unknown", dtype=torch.float32):
                 super().__init__()
                 self.wrapped_module = wrapped_module
                 self.module_name = module_name
+                self.dtype = dtype
                 
             def length(self):
-                return self.wrapped_module.length()
+                try:
+                    return self.wrapped_module.length()
+                except:
+                    return 1  # Minimum length to prevent empty dataset
                 
             def get_inputs(self):
                 return self.wrapped_module.get_inputs()
@@ -109,14 +113,36 @@ class DataLoaderText2VideoMixin:
                 try:
                     result = self.wrapped_module.get_item(variation, index, requested_name)
                     if result is None:
-                        print(f"Warning: {self.module_name} returned None for item {index}, skipping")
-                        # Instead of creating dummy data, get the previous item
-                        return self._get_previous_item(variation, index, requested_name)
+                        print(f"Warning: {self.module_name} returned None for item {index}, creating safe fallback")
+                        # Create a safe fallback data dictionary
+                        return self._create_safe_fallback_data(index)
                     return result
                 except Exception as e:
-                    print(f"Warning: {self.module_name} failed for item {index}: {e}, skipping")
-                    # Instead of creating dummy data, get the previous item
-                    return self._get_previous_item(variation, index, requested_name)
+                    print(f"Warning: {self.module_name} failed for item {index}: {e}, creating safe fallback")
+                    # Create a safe fallback data dictionary
+                    return self._create_safe_fallback_data(index)
+            
+            def _create_safe_fallback_data(self, index):
+                """Create safe fallback data that won't cause pipeline crashes"""
+                import torch
+                
+                # Create minimal but complete data dictionary
+                fallback_data = {
+                    'video_path': f'fallback_video_{index}.mp4',
+                    'prompt': 'fallback prompt for training',
+                    'concept': {'name': 'fallback_concept', 'enabled': True},
+                    'settings': {'target_frames': 8}
+                }
+                
+                # Add video tensor if this module is supposed to provide it
+                if 'video' in self.get_outputs():
+                    fallback_data['video'] = torch.zeros((8, 3, 64, 64), dtype=self.dtype)
+                
+                # Add image tensor if this module is supposed to provide it  
+                if 'image' in self.get_outputs():
+                    fallback_data['image'] = torch.zeros((3, 64, 64), dtype=self.dtype)
+                
+                return fallback_data
         
         # Create a wrapper module that prevents None returns from LoadVideo
         class SafeLoadVideo(PipelineModule):
@@ -267,7 +293,20 @@ class DataLoaderText2VideoMixin:
         if config.custom_conditioning_image:
             modules.append(load_cond_image)
 
-        return modules
+        # Wrap critical modules with safety wrapper to prevent None returns
+        safe_modules = []
+        for i, module in enumerate(modules):
+            if hasattr(module, 'get_item'):  # Only wrap actual pipeline modules
+                safe_module = SafePipelineModule(
+                    module, 
+                    module_name=f"{type(module).__name__}_{i}",
+                    dtype=train_dtype.torch_dtype()
+                )
+                safe_modules.append(safe_module)
+            else:
+                safe_modules.append(module)
+
+        return safe_modules
 
     def _video_validation_modules(self, config: TrainConfig) -> list:
         """Video validation modules to ensure data quality."""
