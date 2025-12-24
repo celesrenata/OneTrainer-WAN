@@ -287,9 +287,13 @@ class DataLoaderText2VideoMixin:
                 
             def get_item(self, variation, index, requested_name=None):
                 try:
+                    print(f"DEBUG SAFE_LOAD_VIDEO: Processing item {index}, variation {variation}")
                     result = self.load_video_module.get_item(variation, index, requested_name)
+                    
                     if result is None:
-                        print(f"Warning: LoadVideo returned None for item {index}, creating dummy data")
+                        print(f"DEBUG SAFE_LOAD_VIDEO ERROR: LoadVideo returned None for item {index}")
+                        print(f"  - This means the underlying video loading failed")
+                        print(f"  - Creating dummy data to prevent pipeline crash")
                         # Create comprehensive dummy data to prevent pipeline crash
                         import torch
                         dummy_video = torch.zeros((8, 3, 64, 64), dtype=self.dtype)  # 8 frames, 3 channels, 64x64
@@ -300,9 +304,21 @@ class DataLoaderText2VideoMixin:
                             'prompt': 'dummy prompt',
                             'settings': {'target_frames': 8}
                         }
+                    
+                    # Log successful loading
+                    video_path = result.get('video_path', 'unknown')
+                    video_data = result.get('video', None)
+                    if hasattr(video_data, 'shape'):
+                        print(f"DEBUG SAFE_LOAD_VIDEO SUCCESS: {video_path} loaded with shape {video_data.shape}")
+                    else:
+                        print(f"DEBUG SAFE_LOAD_VIDEO SUCCESS: {video_path} loaded, type={type(video_data)}")
+                    
                     return result
+                    
                 except Exception as e:
-                    print(f"Warning: LoadVideo failed for item {index}: {e}, creating dummy data")
+                    print(f"DEBUG SAFE_LOAD_VIDEO EXCEPTION: LoadVideo failed for item {index}: {e}")
+                    print(f"  - Exception type: {type(e).__name__}")
+                    print(f"  - Creating dummy data to prevent pipeline crash")
                     # Create comprehensive dummy data to prevent pipeline crash
                     import torch
                     dummy_video = torch.zeros((8, 3, 64, 64), dtype=self.dtype)  # 8 frames, 3 channels, 64x64
@@ -441,18 +457,55 @@ class DataLoaderText2VideoMixin:
 
     def _video_validation_modules(self, config: TrainConfig) -> list:
         """Video validation modules to ensure data quality."""
-        # For now, disable video validation to avoid pipeline issues
-        # Video validation can be added later when MGDS pipeline properly handles filtering
+        # Re-enabled video validation with debug logging to identify issues
+        print("DEBUG: Video validation enabled - will show detailed error messages")
         
-        # The original FilterByFunction module is not available in current MGDS version
-        # and custom filtering that returns None causes downstream pipeline issues
-        # where modules try to access None[item_name] causing TypeError
+        validation_modules = []
         
-        # TODO: Implement proper video validation when MGDS supports it
-        # or when we can implement a filtering mechanism that doesn't break the pipeline
+        # Add basic video validation that logs issues instead of filtering
+        try:
+            from mgds.pipelineModules import FilterByFunction
+            
+            def validate_video_debug(sample):
+                """Debug video validation that logs issues but doesn't filter"""
+                try:
+                    video_path = sample.get('video_path', 'unknown')
+                    print(f"DEBUG VIDEO VALIDATION: Processing {video_path}")
+                    
+                    # Check if video data exists
+                    if 'video' not in sample:
+                        print(f"DEBUG VIDEO ERROR: No 'video' key in sample for {video_path}")
+                        return None  # This will cause filtering
+                    
+                    video_data = sample['video']
+                    if video_data is None:
+                        print(f"DEBUG VIDEO ERROR: Video data is None for {video_path}")
+                        return None
+                    
+                    # Check video properties if it's a tensor/array
+                    if hasattr(video_data, 'shape'):
+                        print(f"DEBUG VIDEO SUCCESS: {video_path} shape={video_data.shape}")
+                    else:
+                        print(f"DEBUG VIDEO INFO: {video_path} type={type(video_data)}")
+                    
+                    return sample  # Pass through valid samples
+                    
+                except Exception as e:
+                    video_path = sample.get('video_path', 'unknown')
+                    print(f"DEBUG VIDEO EXCEPTION: {video_path} - {str(e)}")
+                    return None  # Filter out problematic samples
+            
+            validation_modules.append(FilterByFunction(
+                function=validate_video_debug,
+                inputs=['video', 'video_path']
+            ))
+            
+        except ImportError:
+            print("DEBUG: FilterByFunction not available, using basic validation")
+        except Exception as e:
+            print(f"DEBUG: Error setting up video validation: {e}")
         
-        print("Video validation temporarily disabled to prevent pipeline errors")
-        return []
+        return validation_modules
 
     def _video_augmentation_modules(self, config: TrainConfig) -> list:
         """Video-specific augmentation modules."""

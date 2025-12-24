@@ -5,20 +5,6 @@ from enum import Enum
 from mgds.PipelineModule import PipelineModule
 from modules.util.video_util import FrameSamplingStrategy, sample_video_frames
 
-# DEBUG: Added for video validation debugging
-import logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-def debug_video_file(file_path, error=None):
-    """Debug video file loading"""
-    logger.debug(f"DEBUG VIDEO: Processing {file_path}")
-    if error:
-        logger.error(f"DEBUG VIDEO ERROR: {file_path} - {error}")
-    else:
-        logger.debug(f"DEBUG VIDEO SUCCESS: {file_path}")
-
-
 
 class VideoFrameSampler(PipelineModule):
     """
