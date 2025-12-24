@@ -100,6 +100,7 @@ class DataLoaderText2VideoMixin:
             def length(self):
                 try:
                     length = self.wrapped_module.length()
+                    # Always log length calls to trace data flow
                     print(f"INFO: {self.module_name} length() returned: {length}")
                     return length
                 except Exception as e:

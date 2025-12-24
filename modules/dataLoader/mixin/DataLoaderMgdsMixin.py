@@ -23,11 +23,18 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
     ):
         concepts = config.concepts
         if concepts is None:
+            print(f"INFO: Loading concepts from file: {config.concept_file_name}")
             with open(config.concept_file_name, 'r') as f:
                 concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
+            print(f"INFO: Loaded {len(concepts)} concepts from file")
 
         # choose all validation concepts, or none of them, depending on is_validation
+        original_count = len(concepts)
         concepts = [concept for concept in concepts if (ConceptType(concept.type) == ConceptType.VALIDATION) == is_validation]
+        print(f"INFO: Filtered concepts: {original_count} -> {len(concepts)} (is_validation={is_validation})")
+        
+        for i, concept in enumerate(concepts):
+            print(f"INFO: Concept {i}: name='{concept.name}', path='{concept.path}', enabled={concept.enabled}")
 
         # convert before passing to MGDS
         concepts = [c.to_dict() for c in concepts]
@@ -36,6 +43,7 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             "target_resolution": config.resolution,
             "target_frames": config.frames,
         }
+        print(f"INFO: MGDS settings: resolution={config.resolution}, frames={config.frames}")
 
         # Just defaults for now.
         ds = MGDS(
