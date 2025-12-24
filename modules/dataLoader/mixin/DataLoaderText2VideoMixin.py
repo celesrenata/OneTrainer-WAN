@@ -640,12 +640,16 @@ class DataLoaderText2VideoMixin:
         world_size = multi.world_size()
 
         output = OutputPipelineModule(output_names)
+        sort_names = output_names + ['concept']
+        
         batch_sorting = AspectBatchSorting(
-            batch_size=config.batch_size,
+            batch_size=config.batch_size * world_size,
             resolution_in_name='crop_resolution',
-            names=['crop_resolution'],
+            names=sort_names,
         )
-        distributed_sampler = DistributedSampler()
+        
+        sort_names = output_names + ['concept']
+        distributed_sampler = DistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
 
         modules = []
 
