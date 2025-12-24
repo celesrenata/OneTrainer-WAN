@@ -556,6 +556,14 @@ class WanBaseDataLoader(
                         module_name=module_name,
                         dtype=model.train_dtype.torch_dtype()
                     )
+                    
+                    # Log the length immediately after wrapping
+                    try:
+                        length = safe_module.length()
+                        print(f"INFO: {module_name} wrapped length: {length}")
+                    except Exception as e:
+                        print(f"WARNING: {module_name} length check failed: {e}")
+                    
                     safe_group.append(safe_module)
                 else:
                     print(f"DEBUG: Module {module_name} does not have get_item, adding as-is")

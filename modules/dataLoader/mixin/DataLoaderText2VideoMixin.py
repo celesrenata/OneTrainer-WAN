@@ -56,6 +56,8 @@ class DataLoaderText2VideoMixin:
         supported_extensions = set()
         supported_extensions |= path_util.supported_image_extensions()
         supported_extensions |= path_util.supported_video_extensions()
+        
+        print(f"INFO: Supported extensions: {supported_extensions}")
 
         download_datasets = DownloadHuggingfaceDatasets(
             concept_in_name='concept', path_in_name='path', enabled_in_name='enabled',
@@ -67,6 +69,8 @@ class DataLoaderText2VideoMixin:
             path_out_name='video_path', concept_out_name='concept',
             extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel','-condlabel']
         )
+        
+        print(f"INFO: Created CollectPaths module with extensions: {supported_extensions}")
 
         mask_path = ModifyPath(in_name='video_path', out_name='mask_path', postfix='-masklabel', extension='.png')
         cond_path = ModifyPath(in_name='video_path', out_name='cond_path', postfix='-condlabel', extension='.png')
