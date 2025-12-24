@@ -642,8 +642,8 @@ class DataLoaderText2VideoMixin:
         output = OutputPipelineModule(output_names)
         batch_sorting = AspectBatchSorting(
             batch_size=config.batch_size,
-            balancing_strategy=config.balancing_strategy,
-            balancing_strategy_args=config.balancing_strategy_args,
+            balancing_strategy=getattr(config, 'balancing_strategy', 'random'),
+            balancing_strategy_args=getattr(config, 'balancing_strategy_args', {}),
             resolution_in_name='crop_resolution',
             names_to_group_by=['crop_resolution'],
             frame_count_in_name='settings.target_frames',
