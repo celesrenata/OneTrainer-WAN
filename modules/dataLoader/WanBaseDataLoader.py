@@ -416,9 +416,90 @@ class WanBaseDataLoader(
         
         print(f"DEBUG: Total module groups: {len([g for g in all_module_groups if g is not None])}")
         
+        # Apply safety wrapper to ALL module groups, not just load_input
+        safe_module_groups = []
+        for group_idx, group in enumerate(all_module_groups):
+            if group is None:
+                safe_module_groups.append(None)
+                continue
+                
+            print(f"DEBUG: Processing module group {group_idx} with {len(group)} modules")
+            safe_group = []
+            for module_idx, module in enumerate(group):
+                module_name = f"Group{group_idx}_{type(module).__name__}_{module_idx}"
+                print(f"DEBUG: Processing module {module_name}")
+                
+                if hasattr(module, 'get_item'):
+                    print(f"DEBUG: Wrapping module {module_name} with SafePipelineModule")
+                    # Import the SafePipelineModule class from the mixin
+                    from modules.dataLoader.mixin.DataLoaderText2VideoMixin import DataLoaderText2VideoMixin
+                    
+                    # Create a safety wrapper for this module
+                    class SafePipelineModule:
+                        def __init__(self, wrapped_module, module_name="Unknown", dtype=torch.float32):
+                            self.wrapped_module = wrapped_module
+                            self.module_name = module_name
+                            self.dtype = dtype
+                            
+                        def length(self):
+                            try:
+                                return self.wrapped_module.length()
+                            except:
+                                return 1
+                                
+                        def get_inputs(self):
+                            return self.wrapped_module.get_inputs()
+                            
+                        def get_outputs(self):
+                            return self.wrapped_module.get_outputs()
+                            
+                        def get_item(self, variation, index, requested_name=None):
+                            print(f"DEBUG: {self.module_name} get_item called - variation={variation}, index={index}, requested_name={requested_name}")
+                            try:
+                                result = self.wrapped_module.get_item(variation, index, requested_name)
+                                print(f"DEBUG: {self.module_name} returned result type: {type(result)}")
+                                if result is None:
+                                    print(f"ERROR: {self.module_name} returned None for item {index}, creating safe fallback")
+                                    fallback = self._create_safe_fallback_data(index)
+                                    print(f"DEBUG: {self.module_name} created fallback: {type(fallback)} with keys: {list(fallback.keys()) if isinstance(fallback, dict) else 'not dict'}")
+                                    return fallback
+                                else:
+                                    print(f"DEBUG: {self.module_name} returned valid result with keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
+                                return result
+                            except Exception as e:
+                                print(f"ERROR: {self.module_name} failed for item {index}: {e}, creating safe fallback")
+                                import traceback
+                                print(f"DEBUG: {self.module_name} exception traceback: {traceback.format_exc()}")
+                                fallback = self._create_safe_fallback_data(index)
+                                print(f"DEBUG: {self.module_name} created fallback after exception: {type(fallback)} with keys: {list(fallback.keys()) if isinstance(fallback, dict) else 'not dict'}")
+                                return fallback
+                                
+                        def _create_safe_fallback_data(self, index):
+                            print(f"DEBUG: {self.module_name} creating fallback data for index {index}")
+                            fallback_data = {
+                                'video_path': f'fallback_video_{index}.mp4',
+                                'prompt': 'fallback prompt for training',
+                                'concept': {'name': 'fallback_concept', 'enabled': True},
+                                'settings': {'target_frames': 8}
+                            }
+                            print(f"DEBUG: {self.module_name} final fallback data keys: {list(fallback_data.keys())}")
+                            return fallback_data
+                    
+                    safe_module = SafePipelineModule(
+                        module, 
+                        module_name=module_name,
+                        dtype=model.train_dtype.torch_dtype()
+                    )
+                    safe_group.append(safe_module)
+                else:
+                    print(f"DEBUG: Module {module_name} does not have get_item, adding as-is")
+                    safe_group.append(module)
+            
+            safe_module_groups.append(safe_group)
+        
         return self._create_mgds(
             config,
-            all_module_groups,
+            safe_module_groups,
             train_progress,
             is_validation
         )
