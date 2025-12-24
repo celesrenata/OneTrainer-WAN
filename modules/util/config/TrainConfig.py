@@ -809,7 +809,7 @@ class TrainConfig(BaseConfig):
         migrated_data = data.copy()
 
         def replace_dtype(part: str):
-            if part in migrated_data and migrated_data[part]["weight_dtype"] == "NONE":
+            if part in migrated_data and "weight_dtype" in migrated_data[part] and migrated_data[part]["weight_dtype"] == "NONE":
                 migrated_data[part]["weight_dtype"] = migrated_data["weight_dtype"]
         replace_dtype("unet")
         replace_dtype("prior")
