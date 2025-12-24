@@ -513,63 +513,6 @@ class DataLoaderText2VideoMixin:
         
         return validation_modules
 
-# DEBUG: MGDS Module Debugging Wrapper
-import functools
-
-def debug_mgds_module(cls):
-    """Decorator to add debugging to MGDS modules"""
-    original_get_item = cls.get_item if hasattr(cls, 'get_item') else None
-    original_length = cls.length if hasattr(cls, 'length') else None
-    
-    if original_get_item:
-        @functools.wraps(original_get_item)
-        def debug_get_item(self, variation, index, requested_name=None):
-            print(f"DEBUG MGDS: {cls.__name__} get_item called - variation={variation}, index={index}")
-            try:
-                result = original_get_item(self, variation, index, requested_name)
-                if result is None:
-                    print(f"DEBUG MGDS: {cls.__name__} returned None for item {index}")
-                else:
-                    print(f"DEBUG MGDS: {cls.__name__} returned {type(result).__name__} for item {index}")
-                    if isinstance(result, dict):
-                        print(f"  - Keys: {list(result.keys())}")
-                return result
-            except Exception as e:
-                print(f"DEBUG MGDS: {cls.__name__} failed for item {index}: {e}")
-                raise
-        
-        cls.get_item = debug_get_item
-    
-    if original_length:
-        @functools.wraps(original_length)
-        def debug_length(self):
-            try:
-                length = original_length(self)
-                print(f"DEBUG MGDS: {cls.__name__} length() = {length}")
-                return length
-            except Exception as e:
-                print(f"DEBUG MGDS: {cls.__name__} length() failed: {e}")
-                raise
-        
-        cls.length = debug_length
-    
-    return cls
-
-# Apply debugging to key MGDS modules
-try:
-    from mgds.pipelineModules.LoadVideo import LoadVideo
-    LoadVideo = debug_mgds_module(LoadVideo)
-    print("DEBUG: Added debugging to LoadVideo")
-except ImportError:
-    print("DEBUG: Could not import LoadVideo for debugging")
-
-try:
-    from mgds.CollectPaths import CollectPaths
-    CollectPaths = debug_mgds_module(CollectPaths)
-    print("DEBUG: Added debugging to CollectPaths")
-except ImportError:
-    print("DEBUG: Could not import CollectPaths for debugging")
-
     def _video_augmentation_modules(self, config: TrainConfig) -> list:
         """Video-specific augmentation modules."""
         inputs = ['video']
@@ -583,38 +526,14 @@ except ImportError:
         if config.custom_conditioning_image:
             inputs.append('custom_conditioning_image')
 
-        # Video augmentations - apply to all frames consistently
-        random_flip = RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip', fixed_enabled_in_name='concept.image.enable_fixed_flip')
-        random_rotate = RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', fixed_enabled_in_name='concept.image.enable_fixed_rotate', max_angle_in_name='concept.image.random_rotate_max_angle')
-        
-        # Color augmentations for video frames
-        video_inputs = ['video']
-        if config.custom_conditioning_image:
-            video_inputs.append('custom_conditioning_image')
-            
-        random_brightness = RandomBrightness(names=video_inputs, enabled_in_name='concept.image.enable_random_brightness', fixed_enabled_in_name='concept.image.enable_fixed_brightness', max_strength_in_name='concept.image.random_brightness_max_strength')
-        random_contrast = RandomContrast(names=video_inputs, enabled_in_name='concept.image.enable_random_contrast', fixed_enabled_in_name='concept.image.enable_fixed_contrast', max_strength_in_name='concept.image.random_contrast_max_strength')
-        random_saturation = RandomSaturation(names=video_inputs, enabled_in_name='concept.image.enable_random_saturation', fixed_enabled_in_name='concept.image.enable_fixed_saturation', max_strength_in_name='concept.image.random_saturation_max_strength')
-        random_hue = RandomHue(names=video_inputs, enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength')
-
-        # Text augmentations
-        drop_tags = DropTags(text_in_name='prompt', enabled_in_name='concept.text.tag_dropout_enable', probability_in_name='concept.text.tag_dropout_probability', dropout_mode_in_name='concept.text.tag_dropout_mode',
-                             special_tags_in_name='concept.text.tag_dropout_special_tags', special_tag_mode_in_name='concept.text.tag_dropout_special_tags_mode', delimiter_in_name='concept.text.tag_delimiter',
-                             keep_tags_count_in_name='concept.text.keep_tags_count', text_out_name='prompt', regex_enabled_in_name='concept.text.tag_dropout_special_tags_regex')
-        caps_randomize = CapitalizeTags(text_in_name='prompt', enabled_in_name='concept.text.caps_randomize_enable', probability_in_name='concept.text.caps_randomize_probability',
-                                        capitalize_mode_in_name='concept.text.caps_randomize_mode', delimiter_in_name='concept.text.tag_delimiter', convert_lowercase_in_name='concept.text.caps_randomize_lowercase', text_out_name='prompt')
-        shuffle_tags = ShuffleTags(text_in_name='prompt', enabled_in_name='concept.text.enable_tag_shuffling', delimiter_in_name='concept.text.tag_delimiter', keep_tags_count_in_name='concept.text.keep_tags_count', text_out_name='prompt')
-
         modules = [
-            random_flip,
-            random_rotate,
-            random_brightness,
-            random_contrast,
-            random_saturation,
-            random_hue,
-            drop_tags,
-            caps_randomize,
-            shuffle_tags,
+            RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip', axis=1),
+            RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', max_angle=20),
+            RandomBrightness(names=inputs, enabled_in_name='concept.image.enable_random_brightness', max_strength=0.2),
+            RandomContrast(names=inputs, enabled_in_name='concept.image.enable_random_contrast', max_strength=0.2),
+            RandomSaturation(names=inputs, enabled_in_name='concept.image.enable_random_saturation', max_strength=0.2),
+            RandomHue(names=inputs, enabled_in_name='concept.image.enable_random_hue', max_strength=0.1),
+            RandomGamma(names=inputs, enabled_in_name='concept.image.enable_random_gamma', max_strength=0.2),
         ]
 
         return modules
@@ -707,46 +626,35 @@ except ImportError:
             self,
             output_names: list[str | tuple[str, str]],
             config: TrainConfig,
-            before_cache_video_fun: Callable[[], None] | None = None,
-            use_conditioning_image: bool = False,
-            vae: AutoencoderKL | None = None,
-            autocast_context: list[torch.autocast | None] = None,
-            train_dtype: DataType | None = None,
-    ):
-        """Video-specific output modules."""
-        sort_names = output_names + ['concept']
+            model,
+    ) -> list:
+        """Create video output modules from output names."""
+        from mgds.pipelineModules.RandomLatentMaskRemove import RandomLatentMaskRemove
+        from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
+        from mgds.pipelineModules.DistributedSampler import DistributedSampler
 
-        output_names = output_names + [
-            ('concept.loss_weight', 'loss_weight'),
-            ('concept.type', 'concept_type'),
-        ]
+        world_size = multi.get_world_size()
 
-        if config.validation:
-            output_names.append(('concept.name', 'concept_name'))
-            output_names.append(('concept.path', 'concept_path'))
-            output_names.append(('concept.seed', 'concept_seed'))
-
-        mask_remove = RandomLatentMaskRemove(
-            latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image' if use_conditioning_image else None,
-            replace_probability=config.unmasked_probability, vae=vae,
-            possible_resolutions_in_name='possible_resolutions',
-            autocast_contexts=autocast_context, dtype=train_dtype.torch_dtype(),
-            before_cache_fun=before_cache_video_fun,
+        output = OutputPipelineModule(output_names)
+        batch_sorting = AspectBatchSorting(
+            batch_size=config.batch_size,
+            balancing_strategy=config.balancing_strategy,
+            balancing_strategy_args=config.balancing_strategy_args,
+            resolution_in_name='crop_resolution',
+            names_to_group_by=['crop_resolution'],
+            frame_count_in_name='settings.target_frames',
+            enable_frame_grouping=True,  # Enable frame-based grouping for video
         )
-
-        world_size = multi.world_size() if config.multi_gpu else 1
-        if config.latent_caching:
-            batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
-            distributed_sampler = DistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
-        else:
-            batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
-            distributed_sampler = InlineDistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
-
-        output = OutputPipelineModule(names=output_names)
+        distributed_sampler = DistributedSampler()
 
         modules = []
 
-        if config.model_type.has_mask_input():
+        if config.latent_caching:
+            mask_remove = RandomLatentMaskRemove(
+                probability=0.1,
+                names=['latent_image', 'latent_conditioning_image'],
+                mask_name='latent_mask'
+            )
             modules.append(mask_remove)
 
         modules.append(batch_sorting)
