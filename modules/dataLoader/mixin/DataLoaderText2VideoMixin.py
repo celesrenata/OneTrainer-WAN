@@ -151,6 +151,11 @@ class DataLoaderText2VideoMixin:
             def clear_item_cache(self):
                 """Clear item cache - required by MGDS pipeline"""
                 print(f"DEBUG: {self.module_name} clear_item_cache called")
+                
+                # First call the parent class method to initialize __local_cache
+                super().clear_item_cache()
+                
+                # Then optionally call the wrapped module's method
                 try:
                     if hasattr(self.wrapped_module, 'clear_item_cache'):
                         return self.wrapped_module.clear_item_cache()

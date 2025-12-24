@@ -435,11 +435,15 @@ class WanBaseDataLoader(
                     from modules.dataLoader.mixin.DataLoaderText2VideoMixin import DataLoaderText2VideoMixin
                     
                     # Create a safety wrapper for this module
-                    class SafePipelineModule:
+                    # Import PipelineModule for proper inheritance
+                    from mgds.PipelineModule import PipelineModule
+                    
+                    class SafePipelineModule(PipelineModule):
                         def __init__(self, wrapped_module, module_name="Unknown", dtype=torch.float32):
                             self.wrapped_module = wrapped_module
                             self.module_name = module_name
                             self.dtype = dtype
+                            super().__init__()
                             
                         def length(self):
                             try:
@@ -495,6 +499,11 @@ class WanBaseDataLoader(
                         def clear_item_cache(self):
                             """Clear item cache - required by MGDS pipeline"""
                             print(f"DEBUG: {self.module_name} clear_item_cache called")
+                            
+                            # First call the parent class method to initialize __local_cache
+                            super().clear_item_cache()
+                            
+                            # Then optionally call the wrapped module's method
                             try:
                                 if hasattr(self.wrapped_module, 'clear_item_cache'):
                                     return self.wrapped_module.clear_item_cache()
