@@ -1,10 +1,23 @@
 import cv2
 import os
 import pathlib
+import logging
 from typing import List, Tuple, Optional, Union
 from enum import Enum
 
 from modules.util import path_util
+
+# DEBUG: Added for video validation debugging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+def debug_video_file(file_path, error=None):
+    """Debug video file loading"""
+    logger.debug(f"DEBUG VIDEO: Processing {file_path}")
+    if error:
+        logger.error(f"DEBUG VIDEO ERROR: {file_path} - {error}")
+    else:
+        logger.debug(f"DEBUG VIDEO SUCCESS: {file_path}")
 
 
 class FrameSamplingStrategy(Enum):
@@ -517,20 +530,6 @@ def save_video_with_quality_options(
     try:
         import torch
         from torchvision.io import write_video
-
-# DEBUG: Added for video validation debugging
-import logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-def debug_video_file(file_path, error=None):
-    """Debug video file loading"""
-    logger.debug(f"DEBUG VIDEO: Processing {file_path}")
-    if error:
-        logger.error(f"DEBUG VIDEO ERROR: {file_path} - {error}")
-    else:
-        logger.debug(f"DEBUG VIDEO SUCCESS: {file_path}")
-
         
         path = pathlib.Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
