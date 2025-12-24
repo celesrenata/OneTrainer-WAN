@@ -391,6 +391,64 @@ class DataLoaderText2VideoMixin:
                     print(f"Warning: LoadImage failed for item {index}: {e}, creating dummy data")
                     # Create comprehensive dummy data to prevent pipeline crash
                     import torch
+
+# DEBUG: MGDS Module Debugging Wrapper
+import functools
+
+def debug_mgds_module(cls):
+    """Decorator to add debugging to MGDS modules"""
+    original_get_item = cls.get_item if hasattr(cls, 'get_item') else None
+    original_length = cls.length if hasattr(cls, 'length') else None
+    
+    if original_get_item:
+        @functools.wraps(original_get_item)
+        def debug_get_item(self, variation, index, requested_name=None):
+            print(f"DEBUG MGDS: {cls.__name__} get_item called - variation={variation}, index={index}")
+            try:
+                result = original_get_item(self, variation, index, requested_name)
+                if result is None:
+                    print(f"DEBUG MGDS: {cls.__name__} returned None for item {index}")
+                else:
+                    print(f"DEBUG MGDS: {cls.__name__} returned {type(result).__name__} for item {index}")
+                    if isinstance(result, dict):
+                        print(f"  - Keys: {list(result.keys())}")
+                return result
+            except Exception as e:
+                print(f"DEBUG MGDS: {cls.__name__} failed for item {index}: {e}")
+                raise
+        
+        cls.get_item = debug_get_item
+    
+    if original_length:
+        @functools.wraps(original_length)
+        def debug_length(self):
+            try:
+                length = original_length(self)
+                print(f"DEBUG MGDS: {cls.__name__} length() = {length}")
+                return length
+            except Exception as e:
+                print(f"DEBUG MGDS: {cls.__name__} length() failed: {e}")
+                raise
+        
+        cls.length = debug_length
+    
+    return cls
+
+# Apply debugging to key MGDS modules
+try:
+    from mgds.pipelineModules.LoadVideo import LoadVideo
+    LoadVideo = debug_mgds_module(LoadVideo)
+    print("DEBUG: Added debugging to LoadVideo")
+except ImportError:
+    print("DEBUG: Could not import LoadVideo for debugging")
+
+try:
+    from mgds.CollectPaths import CollectPaths
+    CollectPaths = debug_mgds_module(CollectPaths)
+    print("DEBUG: Added debugging to CollectPaths")
+except ImportError:
+    print("DEBUG: Could not import CollectPaths for debugging")
+
                     dummy_image = torch.zeros((3, 64, 64), dtype=self.dtype)  # 3 channels, 64x64
                     # Return a complete data dictionary with all expected fields
                     return {
