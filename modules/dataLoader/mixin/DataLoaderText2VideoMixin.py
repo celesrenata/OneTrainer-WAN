@@ -528,7 +528,7 @@ class DataLoaderText2VideoMixin:
 
         modules = [
             RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip', fixed_enabled_in_name='concept.image.enable_fixed_flip'),
-            RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', max_angle=20),
+            RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', fixed_enabled_in_name='concept.image.enable_fixed_rotate', max_angle_in_name='concept.image.random_rotate_max_angle'),
             RandomBrightness(names=inputs, enabled_in_name='concept.image.enable_random_brightness', max_strength=0.2),
             RandomContrast(names=inputs, enabled_in_name='concept.image.enable_random_contrast', max_strength=0.2),
             RandomSaturation(names=inputs, enabled_in_name='concept.image.enable_random_saturation', max_strength=0.2),
