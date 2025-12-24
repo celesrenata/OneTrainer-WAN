@@ -1,6 +1,6 @@
 {
     "backup_after": 10,
-    "base_model_name": "wan-ai/WAN_2_2",
+    "base_model_name": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
     "batch_size": 2,
     "gradient_checkpointing": "CPU_OFFLOADED",
     "layer_offload_fraction": 0.5,
