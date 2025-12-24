@@ -529,11 +529,11 @@ class DataLoaderText2VideoMixin:
         modules = [
             RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip', fixed_enabled_in_name='concept.image.enable_fixed_flip'),
             RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', fixed_enabled_in_name='concept.image.enable_fixed_rotate', max_angle_in_name='concept.image.random_rotate_max_angle'),
-            RandomBrightness(names=inputs, enabled_in_name='concept.image.enable_random_brightness', max_strength=0.2),
-            RandomContrast(names=inputs, enabled_in_name='concept.image.enable_random_contrast', max_strength=0.2),
-            RandomSaturation(names=inputs, enabled_in_name='concept.image.enable_random_saturation', max_strength=0.2),
-            RandomHue(names=inputs, enabled_in_name='concept.image.enable_random_hue', max_strength=0.1),
-            RandomGamma(names=inputs, enabled_in_name='concept.image.enable_random_gamma', max_strength=0.2),
+            RandomBrightness(names=inputs, enabled_in_name='concept.image.enable_random_brightness', fixed_enabled_in_name='concept.image.enable_fixed_brightness', max_strength_in_name='concept.image.random_brightness_max_strength'),
+            RandomContrast(names=inputs, enabled_in_name='concept.image.enable_random_contrast', fixed_enabled_in_name='concept.image.enable_fixed_contrast', max_strength_in_name='concept.image.random_contrast_max_strength'),
+            RandomSaturation(names=inputs, enabled_in_name='concept.image.enable_random_saturation', fixed_enabled_in_name='concept.image.enable_fixed_saturation', max_strength_in_name='concept.image.random_saturation_max_strength'),
+            RandomHue(names=inputs, enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength'),
+            RandomGamma(names=inputs, enabled_in_name='concept.image.enable_random_gamma', fixed_enabled_in_name='concept.image.enable_fixed_gamma', max_strength_in_name='concept.image.random_gamma_max_strength'),
         ]
 
         return modules
