@@ -475,8 +475,9 @@ class WanModelLoader(
         model.tokenizer = tokenizer
         model.noise_scheduler = noise_scheduler
         
-        print(f"Mock WAN 2.2 model created successfully for video pipeline testing")    
-def _create_mock_vae(self, dtype):
+        print(f"Mock WAN 2.2 model created successfully for video pipeline testing")
+
+    def _create_mock_vae(self, dtype):
         """Create a mock VAE for video processing."""
         import torch.nn as nn
         
