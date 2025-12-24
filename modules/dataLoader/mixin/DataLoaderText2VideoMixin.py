@@ -408,6 +408,9 @@ class DataLoaderText2VideoMixin:
                         'settings': {'target_frames': 1}
                     }
         
+        # Wrap with safety module
+        load_image = SafeLoadImage(load_image_base, dtype=train_dtype.torch_dtype())
+        
         # Convert image to video format for consistency
         image_to_video = ImageToVideo(in_name='image', out_name='video')
         
