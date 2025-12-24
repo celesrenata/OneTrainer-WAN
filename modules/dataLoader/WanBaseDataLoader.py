@@ -378,9 +378,16 @@ class WanBaseDataLoader(
             is_validation: bool = False,
     ):
         """Create the complete video dataset pipeline."""
+        print("DEBUG: Creating WAN video dataset pipeline")
         enumerate_input = self._enumerate_input_modules(config)
+        print(f"DEBUG: enumerate_input modules: {len(enumerate_input) if enumerate_input else 0}")
+        
         video_validation = self._video_validation_modules(config)
+        print(f"DEBUG: video_validation modules: {len(video_validation) if video_validation else 0}")
+        
         load_input = self._load_input_modules(config, model.train_dtype)
+        print(f"DEBUG: load_input modules: {len(load_input) if load_input else 0}")
+        
         video_mask_augmentation = self._video_mask_augmentation_modules(config)
         video_aspect_bucketing_in = self._video_aspect_bucketing_in(config, 64)
         video_crop_modules = self._video_crop_modules(config)
@@ -392,23 +399,26 @@ class WanBaseDataLoader(
 
         debug_modules = self._debug_modules(config, model)
 
+        all_module_groups = [
+            enumerate_input,
+            video_validation,  # Add video validation early in pipeline
+            load_input,
+            video_mask_augmentation,
+            video_aspect_bucketing_in,
+            video_crop_modules,
+            video_augmentation_modules,
+            video_inpainting_modules,
+            preparation_modules,
+            cache_modules,
+            output_modules,
+            debug_modules if config.debug_mode else None,
+        ]
+        
+        print(f"DEBUG: Total module groups: {len([g for g in all_module_groups if g is not None])}")
+        
         return self._create_mgds(
             config,
-            [
-                enumerate_input,
-                video_validation,  # Add video validation early in pipeline
-                load_input,
-                video_mask_augmentation,
-                video_aspect_bucketing_in,
-                video_crop_modules,
-                video_augmentation_modules,
-                video_inpainting_modules,
-                preparation_modules,
-                cache_modules,
-                output_modules,
-
-                debug_modules if config.debug_mode else None,
-            ],
+            all_module_groups,
             train_progress,
             is_validation
         )

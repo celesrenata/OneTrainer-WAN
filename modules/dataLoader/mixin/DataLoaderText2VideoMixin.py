@@ -110,21 +110,33 @@ class DataLoaderText2VideoMixin:
                 return self.wrapped_module.get_outputs()
                 
             def get_item(self, variation, index, requested_name=None):
+                print(f"DEBUG: {self.module_name} get_item called - variation={variation}, index={index}, requested_name={requested_name}")
                 try:
                     result = self.wrapped_module.get_item(variation, index, requested_name)
+                    print(f"DEBUG: {self.module_name} returned result type: {type(result)}")
                     if result is None:
-                        print(f"Warning: {self.module_name} returned None for item {index}, creating safe fallback")
+                        print(f"ERROR: {self.module_name} returned None for item {index}, creating safe fallback")
                         # Create a safe fallback data dictionary
-                        return self._create_safe_fallback_data(index)
+                        fallback = self._create_safe_fallback_data(index)
+                        print(f"DEBUG: {self.module_name} created fallback: {type(fallback)} with keys: {list(fallback.keys()) if isinstance(fallback, dict) else 'not dict'}")
+                        return fallback
+                    else:
+                        print(f"DEBUG: {self.module_name} returned valid result with keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
                     return result
                 except Exception as e:
-                    print(f"Warning: {self.module_name} failed for item {index}: {e}, creating safe fallback")
+                    print(f"ERROR: {self.module_name} failed for item {index}: {e}, creating safe fallback")
+                    import traceback
+                    print(f"DEBUG: {self.module_name} exception traceback: {traceback.format_exc()}")
                     # Create a safe fallback data dictionary
-                    return self._create_safe_fallback_data(index)
+                    fallback = self._create_safe_fallback_data(index)
+                    print(f"DEBUG: {self.module_name} created fallback after exception: {type(fallback)} with keys: {list(fallback.keys()) if isinstance(fallback, dict) else 'not dict'}")
+                    return fallback
             
             def _create_safe_fallback_data(self, index):
                 """Create safe fallback data that won't cause pipeline crashes"""
                 import torch
+                
+                print(f"DEBUG: {self.module_name} creating fallback data for index {index}")
                 
                 # Create minimal but complete data dictionary
                 fallback_data = {
@@ -134,14 +146,26 @@ class DataLoaderText2VideoMixin:
                     'settings': {'target_frames': 8}
                 }
                 
-                # Add video tensor if this module is supposed to provide it
-                if 'video' in self.get_outputs():
-                    fallback_data['video'] = torch.zeros((8, 3, 64, 64), dtype=self.dtype)
+                print(f"DEBUG: {self.module_name} base fallback data created")
                 
-                # Add image tensor if this module is supposed to provide it  
-                if 'image' in self.get_outputs():
-                    fallback_data['image'] = torch.zeros((3, 64, 64), dtype=self.dtype)
+                try:
+                    outputs = self.get_outputs()
+                    print(f"DEBUG: {self.module_name} outputs: {outputs}")
+                    
+                    # Add video tensor if this module is supposed to provide it
+                    if 'video' in outputs:
+                        fallback_data['video'] = torch.zeros((8, 3, 64, 64), dtype=self.dtype)
+                        print(f"DEBUG: {self.module_name} added video tensor")
+                    
+                    # Add image tensor if this module is supposed to provide it  
+                    if 'image' in outputs:
+                        fallback_data['image'] = torch.zeros((3, 64, 64), dtype=self.dtype)
+                        print(f"DEBUG: {self.module_name} added image tensor")
+                        
+                except Exception as e:
+                    print(f"DEBUG: {self.module_name} error getting outputs: {e}")
                 
+                print(f"DEBUG: {self.module_name} final fallback data keys: {list(fallback_data.keys())}")
                 return fallback_data
         
         # Create a wrapper module that prevents None returns from LoadVideo
@@ -294,18 +318,24 @@ class DataLoaderText2VideoMixin:
             modules.append(load_cond_image)
 
         # Wrap critical modules with safety wrapper to prevent None returns
+        print(f"DEBUG: Wrapping {len(modules)} modules with safety wrapper")
         safe_modules = []
         for i, module in enumerate(modules):
+            module_name = f"{type(module).__name__}_{i}"
+            print(f"DEBUG: Processing module {i}: {module_name}")
             if hasattr(module, 'get_item'):  # Only wrap actual pipeline modules
+                print(f"DEBUG: Wrapping module {module_name} with SafePipelineModule")
                 safe_module = SafePipelineModule(
                     module, 
-                    module_name=f"{type(module).__name__}_{i}",
+                    module_name=module_name,
                     dtype=train_dtype.torch_dtype()
                 )
                 safe_modules.append(safe_module)
             else:
+                print(f"DEBUG: Module {module_name} does not have get_item, adding as-is")
                 safe_modules.append(module)
 
+        print(f"DEBUG: Created {len(safe_modules)} safe modules")
         return safe_modules
 
     def _video_validation_modules(self, config: TrainConfig) -> list:
