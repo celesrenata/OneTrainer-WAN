@@ -637,7 +637,7 @@ class DataLoaderText2VideoMixin:
         from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
         from mgds.pipelineModules.DistributedSampler import DistributedSampler
 
-        world_size = multi.get_world_size()
+        world_size = multi.world_size()
 
         output = OutputPipelineModule(output_names)
         batch_sorting = AspectBatchSorting(
