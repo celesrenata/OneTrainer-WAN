@@ -1,6 +1,7 @@
 import copy
 import os
 import traceback
+import torch
 
 from modules.model.WanModel import WanModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
