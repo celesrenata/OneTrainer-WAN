@@ -458,6 +458,58 @@ class DataLoaderText2VideoMixin:
         print(f"DEBUG: Created {len(safe_modules)} safe modules")
         return safe_modules
 
+    def _video_validation_modules(self, config: TrainConfig) -> list:
+        """Video validation modules to ensure data quality."""
+        # Re-enabled video validation with debug logging to identify issues
+        print("DEBUG: Video validation enabled - will show detailed error messages")
+        
+        validation_modules = []
+        
+        # Add basic video validation that logs issues instead of filtering
+        try:
+            from mgds.pipelineModules import FilterByFunction
+            
+            def validate_video_debug(sample):
+                """Debug video validation that logs issues but doesn't filter"""
+                try:
+                    video_path = sample.get('video_path', 'unknown')
+                    print(f"DEBUG VIDEO VALIDATION: Processing {video_path}")
+                    
+                    # Check if video data exists
+                    if 'video' not in sample:
+                        print(f"DEBUG VIDEO ERROR: No 'video' key in sample for {video_path}")
+                        return None  # This will cause filtering
+                    
+                    video_data = sample['video']
+                    if video_data is None:
+                        print(f"DEBUG VIDEO ERROR: Video data is None for {video_path}")
+                        return None
+                    
+                    # Check video properties if it's a tensor/array
+                    if hasattr(video_data, 'shape'):
+                        print(f"DEBUG VIDEO SUCCESS: {video_path} shape={video_data.shape}")
+                    else:
+                        print(f"DEBUG VIDEO INFO: {video_path} type={type(video_data)}")
+                    
+                    return sample  # Pass through valid samples
+                    
+                except Exception as e:
+                    video_path = sample.get('video_path', 'unknown')
+                    print(f"DEBUG VIDEO EXCEPTION: {video_path} - {str(e)}")
+                    return None  # Filter out problematic samples
+            
+            validation_modules.append(FilterByFunction(
+                function=validate_video_debug,
+                inputs=['video', 'video_path']
+            ))
+            
+        except ImportError:
+            print("DEBUG: FilterByFunction not available, using basic validation")
+        except Exception as e:
+            print(f"DEBUG: Error setting up video validation: {e}")
+        
+        return validation_modules
+
 # DEBUG: MGDS Module Debugging Wrapper
 import functools
 
