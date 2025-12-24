@@ -147,6 +147,19 @@ class DataLoaderText2VideoMixin:
                 except Exception as e:
                     print(f"DEBUG: {self.module_name} end failed: {e}")
                     return None
+            
+            def clear_item_cache(self):
+                """Clear item cache - required by MGDS pipeline"""
+                print(f"DEBUG: {self.module_name} clear_item_cache called")
+                try:
+                    if hasattr(self.wrapped_module, 'clear_item_cache'):
+                        return self.wrapped_module.clear_item_cache()
+                    else:
+                        print(f"DEBUG: {self.module_name} wrapped module has no clear_item_cache method, skipping")
+                        return None
+                except Exception as e:
+                    print(f"DEBUG: {self.module_name} clear_item_cache failed: {e}")
+                    return None
                 
             def get_item(self, variation, index, requested_name=None):
                 print(f"DEBUG: {self.module_name} get_item called - variation={variation}, index={index}, requested_name={requested_name}")
