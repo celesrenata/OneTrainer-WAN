@@ -527,7 +527,7 @@ class DataLoaderText2VideoMixin:
             inputs.append('custom_conditioning_image')
 
         modules = [
-            RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip', axis=1),
+            RandomFlip(names=inputs, enabled_in_name='concept.image.enable_random_flip'),
             RandomRotate(names=inputs, enabled_in_name='concept.image.enable_random_rotate', max_angle=20),
             RandomBrightness(names=inputs, enabled_in_name='concept.image.enable_random_brightness', max_strength=0.2),
             RandomContrast(names=inputs, enabled_in_name='concept.image.enable_random_contrast', max_strength=0.2),
