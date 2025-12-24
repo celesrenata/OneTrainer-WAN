@@ -30,7 +30,6 @@ from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
 from mgds.pipelineModules.RandomContrast import RandomContrast
 from mgds.pipelineModules.RandomFlip import RandomFlip
-from mgds.pipelineModules.RandomGamma import RandomGamma
 from mgds.pipelineModules.RandomHue import RandomHue
 from mgds.pipelineModules.RandomLatentMaskRemove import RandomLatentMaskRemove
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
@@ -534,7 +533,6 @@ class DataLoaderText2VideoMixin:
             RandomContrast(names=inputs, enabled_in_name='concept.image.enable_random_contrast', fixed_enabled_in_name='concept.image.enable_fixed_contrast', max_strength_in_name='concept.image.random_contrast_max_strength'),
             RandomSaturation(names=inputs, enabled_in_name='concept.image.enable_random_saturation', fixed_enabled_in_name='concept.image.enable_fixed_saturation', max_strength_in_name='concept.image.random_saturation_max_strength'),
             RandomHue(names=inputs, enabled_in_name='concept.image.enable_random_hue', fixed_enabled_in_name='concept.image.enable_fixed_hue', max_strength_in_name='concept.image.random_hue_max_strength'),
-            RandomGamma(names=inputs, enabled_in_name='concept.image.enable_random_gamma', fixed_enabled_in_name='concept.image.enable_fixed_gamma', max_strength_in_name='concept.image.random_gamma_max_strength'),
         ]
 
         return modules
