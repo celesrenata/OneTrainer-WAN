@@ -92,10 +92,10 @@ class DataLoaderText2VideoMixin:
         # Create a safety wrapper that ensures we never return None from any module
         class SafePipelineModule(PipelineModule):
             def __init__(self, wrapped_module, module_name="Unknown", dtype=torch.float32):
-                super().__init__()
                 self.wrapped_module = wrapped_module
                 self.module_name = module_name
                 self.dtype = dtype
+                super().__init__()
                 
             def length(self):
                 try:
