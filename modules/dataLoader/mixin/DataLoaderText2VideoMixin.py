@@ -644,8 +644,6 @@ class DataLoaderText2VideoMixin:
             batch_size=config.batch_size,
             resolution_in_name='crop_resolution',
             names=['crop_resolution'],
-            frame_count_in_name='settings.target_frames',
-            enable_frame_grouping=True,  # Enable frame-based grouping for video
         )
         distributed_sampler = DistributedSampler()
 
