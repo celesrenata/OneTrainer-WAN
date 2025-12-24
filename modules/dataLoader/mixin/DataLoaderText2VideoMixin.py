@@ -449,25 +449,6 @@ try:
 except ImportError:
     print("DEBUG: Could not import CollectPaths for debugging")
 
-                    dummy_image = torch.zeros((3, 64, 64), dtype=self.dtype)  # 3 channels, 64x64
-                    # Return a complete data dictionary with all expected fields
-                    return {
-                        'image': dummy_image,
-                        'image_path': f'dummy_image_{index}.jpg',
-                        'prompt': 'dummy prompt',
-                        'settings': {'target_frames': 1}
-                    }
-        
-        load_image = SafeLoadImage(load_image_base, dtype=train_dtype.torch_dtype())
-        
-        # Convert single images to video format for consistency
-        image_to_video = ImageToVideo(in_name='image', out_name='video')
-
-        # Generate mask for video frames
-        generate_mask = GenerateImageLike(image_in_name='video', image_out_name='mask', color=255, range_min=0, range_max=1)
-        load_mask = LoadImage(path_in_name='mask_path', image_out_name='mask', range_min=0, range_max=1, channels=1, supported_extensions={".png"}, dtype=train_dtype.torch_dtype())
-        mask_to_video = ImageToVideo(in_name='mask', out_name='mask')
-
         load_cond_image = LoadImage(path_in_name='cond_path', image_out_name='custom_conditioning_image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
 
         load_sample_prompts = LoadMultipleTexts(path_in_name='sample_prompt_path', texts_out_name='sample_prompts')
