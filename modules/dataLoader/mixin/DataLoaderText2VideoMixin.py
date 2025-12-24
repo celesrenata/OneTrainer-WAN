@@ -655,9 +655,14 @@ class DataLoaderText2VideoMixin:
 
         if config.latent_caching:
             mask_remove = RandomLatentMaskRemove(
-                probability=0.1,
-                names=['latent_image', 'latent_conditioning_image'],
-                mask_name='latent_mask'
+                latent_mask_name='latent_mask', 
+                latent_conditioning_image_name='latent_conditioning_image' if use_conditioning_image else None,
+                replace_probability=getattr(config, 'unmasked_probability', 0.1), 
+                vae=vae,
+                possible_resolutions_in_name='possible_resolutions',
+                autocast_contexts=autocast_context, 
+                dtype=train_dtype.torch_dtype() if train_dtype else None,
+                before_cache_fun=before_cache_video_fun,
             )
             modules.append(mask_remove)
 
