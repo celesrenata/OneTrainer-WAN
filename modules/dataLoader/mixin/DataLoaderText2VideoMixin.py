@@ -626,6 +626,8 @@ class DataLoaderText2VideoMixin:
             output_names: list[str | tuple[str, str]],
             config: TrainConfig,
             model,
+            before_cache_video_fun=None,
+            use_conditioning_image=False,
     ) -> list:
         """Create video output modules from output names."""
         from mgds.pipelineModules.RandomLatentMaskRemove import RandomLatentMaskRemove
