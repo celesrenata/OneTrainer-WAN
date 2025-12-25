@@ -1,0 +1,39 @@
+{
+    "backup_after": 10,
+    "base_model_name": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+    "batch_size": 2,
+    "gradient_checkpointing": "CPU_OFFLOADED",
+    "layer_offload_fraction": 0.5,
+    "dataloader_threads": 1,
+    "learning_rate": 0.0003,
+    "model_type": "WAN_2_2",
+    "output_model_destination": "models/wan_lora.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": "256",
+    "frames": 8,
+    "timestep_distribution": "LOGIT_NORMAL",
+    "train_dtype": "BFLOAT_16",
+    "training_method": "LORA",
+    "concept_file_name": "training_concepts/concepts_local.json",
+    "transformer": {
+        "train": true,
+        "weight_dtype": "FLOAT_8"
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "FLOAT_8"
+    },
+    "video_config": {
+        "max_frames": 8,
+        "frame_sample_strategy": "uniform",
+        "target_fps": 24.0,
+        "max_duration": 10.0,
+        "temporal_consistency_weight": 1.0,
+        "use_temporal_attention": true,
+        "spatial_compression_ratio": 8,
+        "temporal_compression_ratio": 4,
+        "video_batch_size_multiplier": 0.5,
+        "frame_dropout_probability": 0.0,
+        "temporal_augmentation": false
+    }
+}
