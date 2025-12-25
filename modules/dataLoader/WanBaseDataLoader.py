@@ -169,9 +169,8 @@ class WanBaseDataLoader(
         )
 
         modules = [video_frame_sampler, rescale_video, encode_video]
-        print(f"DEBUG: Created modules list with {len(modules)} modules")
         for i, module in enumerate(modules):
-            print(f"DEBUG: Module {i}: {type(module).__name__}")
+            print(f"Module {i}: {type(module).__name__}")
 
         if model.tokenizer and model.text_encoder:
             modules.append(add_embeddings_to_prompt)

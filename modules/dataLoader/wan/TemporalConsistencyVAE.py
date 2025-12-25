@@ -24,25 +24,21 @@ class TemporalConsistencyVAE(PipelineModule, SingleVariationRandomAccessPipeline
         dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
-        print(f"🔥 INIT: TemporalConsistencyVAE.__init__ called")
-        print(f"DEBUG: Initializing TemporalConsistencyVAE with VAE: {type(vae)}")
+        print(f"Initializing TemporalConsistencyVAE with VAE: {type(vae)}")
         self.video_in_name = video_in_name
         self.latent_out_name = latent_out_name
         self.vae = vae
         self.temporal_consistency_weight = temporal_consistency_weight
         self.autocast_contexts = autocast_contexts or []
         self.dtype = dtype
-        print(f"🔥 INIT: TemporalConsistencyVAE initialized successfully")
-        print(f"DEBUG: TemporalConsistencyVAE initialized successfully")
+        print(f"TemporalConsistencyVAE initialized successfully")
     
     def length(self) -> int:
-        print(f"🔥 LENGTH: TemporalConsistencyVAE.length() called")
         try:
             result = self._get_previous_length(self.video_in_name)
-            print(f"🔥 LENGTH: TemporalConsistencyVAE.length() = {result}")
             return result
         except Exception as e:
-            print(f"🔥 ERROR in TemporalConsistencyVAE.length(): {e}")
+            print(f"ERROR in TemporalConsistencyVAE.length(): {e}")
             import traceback
             traceback.print_exc()
             return 0
@@ -54,21 +50,15 @@ class TemporalConsistencyVAE(PipelineModule, SingleVariationRandomAccessPipeline
         return [self.latent_out_name]
     
     def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
-        print(f"🔥 ENTRY: TemporalConsistencyVAE.get_item called - variation={variation}, index={index}")
-        
         try:
-            print(f"🔥 STEP 1: Getting previous item '{self.video_in_name}'")
             video = self._get_previous_item(variation, index, self.video_in_name)
-            print(f"🔥 STEP 2: Successfully retrieved video: {video.shape if hasattr(video, 'shape') else type(video)} = {video}")
             
             # If video is None, create dummy video data for testing
             if video is None:
-                print(f"🔥 STEP 3: Creating dummy video data for testing")
                 video = torch.randn(2, 3, 64, 64, dtype=torch.float32)  # Use float32 to match VAE
-                print(f"🔥 STEP 4: Created dummy video: {video.shape}, dtype: {video.dtype}")
                 
         except Exception as e:
-            print(f"🔥 ERROR: Failed to get previous item '{self.video_in_name}': {e}")
+            print(f"ERROR: Failed to get previous item '{self.video_in_name}': {e}")
             return {self.latent_out_name: torch.zeros((2, 48, 8, 8), dtype=self.dtype)}
         
         try:
@@ -107,7 +97,7 @@ class TemporalConsistencyVAE(PipelineModule, SingleVariationRandomAccessPipeline
                 encoded = self.vae.encode(video)
                 latents = encoded.latent_dist.sample()
                 
-                print(f"DEBUG: VAE output shape: {latents.shape}")
+                print(f"VAE output shape: {latents.shape}")
                 
                 # Reshape for transformer: (batch, channels, height, width)
                 if latents.dim() == 5:  # (batch, channels, frames, height, width)
@@ -116,7 +106,6 @@ class TemporalConsistencyVAE(PipelineModule, SingleVariationRandomAccessPipeline
                         # Single frame: reshape to (batch, channels, height, width)
                         latents = latents.squeeze(2)  # Remove frame dimension
                 
-                print(f"🔥 SUCCESS: VAE encoding produces 48-channel latents: {latents.shape}")
                 return {self.latent_out_name: latents}
                 
         except Exception as e:

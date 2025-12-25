@@ -303,8 +303,7 @@ class WanModelLoader(
                 vae = self._create_mock_vae(weight_dtypes.vae.torch_dtype())
                 print("Using mock VAE for WAN 2.2 training")
 
-        print(f"DEBUG: transformer_model_name = {transformer_model_name}")
-        print(f"DEBUG: base_model_name = {base_model_name}")
+        print(f"base_model_name = {base_model_name}")
         
         if transformer_model_name:
             # Load the real WAN 2.2 transformer from the model
