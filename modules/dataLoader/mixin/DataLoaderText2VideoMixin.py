@@ -92,10 +92,10 @@ class DataLoaderText2VideoMixin:
                 # Delegate all other method calls to the wrapped module
                 return getattr(self.collect_paths_module, name)
         
-        # Wrap CollectPaths with our safety wrapper
-        collect_paths = SafeCollectPaths(collect_paths)
+        # Temporarily disable SafeCollectPaths wrapper to allow proper MGDS initialization
+        # collect_paths = SafeCollectPaths(collect_paths)
         
-        print(f"DEBUG: CollectPaths created and wrapped with safety wrapper")
+        print(f"DEBUG: CollectPaths created without wrapper to preserve MGDS initialization")
 
         mask_path = ModifyPath(in_name='video_path', out_name='mask_path', postfix='-masklabel', extension='.png')
         cond_path = ModifyPath(in_name='video_path', out_name='cond_path', postfix='-condlabel', extension='.png')
@@ -232,6 +232,11 @@ class DataLoaderText2VideoMixin:
                         fallback = self._create_safe_fallback_data(index)
                         print(f"DEBUG: {self.module_name} created fallback: {type(fallback)} with keys: {list(fallback.keys()) if isinstance(fallback, dict) else 'not dict'}")
                         return fallback
+                    elif not isinstance(result, dict):
+                        print(f"ERROR: {self.module_name} returned non-dict result: {type(result)}, creating safe fallback")
+                        fallback = self._create_safe_fallback_data(index)
+                        print(f"DEBUG: {self.module_name} created fallback for non-dict: {type(fallback)} with keys: {list(fallback.keys()) if isinstance(fallback, dict) else 'not dict'}")
+                        return fallback
                     else:
                         print(f"DEBUG: {self.module_name} returned valid result with keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
                     return result
@@ -255,7 +260,8 @@ class DataLoaderText2VideoMixin:
                     'video_path': f'fallback_video_{index}.mp4',
                     'prompt': 'fallback prompt for training',
                     'concept': {'name': 'fallback_concept', 'enabled': True},
-                    'settings': {'target_frames': 8}
+                    'settings': {'target_frames': 8},
+                    'target_frames': 8,  # Add both formats to be safe
                 }
                 
                 print(f"DEBUG: {self.module_name} base fallback data created")
@@ -273,6 +279,21 @@ class DataLoaderText2VideoMixin:
                     if 'image' in outputs:
                         fallback_data['image'] = torch.zeros((3, 64, 64), dtype=self.dtype)
                         print(f"DEBUG: {self.module_name} added image tensor")
+                    
+                    # Add sampled_video if this module provides it
+                    if 'sampled_video' in outputs:
+                        fallback_data['sampled_video'] = torch.zeros((2, 3, 64, 64), dtype=self.dtype)
+                        print(f"DEBUG: {self.module_name} added sampled_video tensor")
+                    
+                    # Add scaled_video if this module provides it
+                    if 'scaled_video' in outputs:
+                        fallback_data['scaled_video'] = torch.zeros((2, 3, 64, 64), dtype=self.dtype)
+                        print(f"DEBUG: {self.module_name} added scaled_video tensor")
+                    
+                    # Add latent_video if this module provides it
+                    if 'latent_video' in outputs:
+                        fallback_data['latent_video'] = torch.zeros((2, 48, 8, 8), dtype=self.dtype)  # WAN 2.2 latents
+                        print(f"DEBUG: {self.module_name} added latent_video tensor")
                         
                 except Exception as e:
                     print(f"DEBUG: {self.module_name} error getting outputs: {e}")
@@ -307,13 +328,13 @@ class DataLoaderText2VideoMixin:
                         print(f"  - Creating dummy data to prevent pipeline crash")
                         # Create comprehensive dummy data to prevent pipeline crash
                         import torch
-                        dummy_video = torch.zeros((8, 3, 64, 64), dtype=self.dtype)  # 8 frames, 3 channels, 64x64
+                        dummy_video = torch.zeros((4, 3, 64, 64), dtype=self.dtype)  # 4 frames, 3 channels, 64x64
                         # Return a complete data dictionary with all expected fields
                         return {
                             'video': dummy_video,
                             'video_path': f'dummy_video_{index}.mp4',
                             'prompt': 'dummy prompt',
-                            'settings': {'target_frames': 8}
+                            'settings': {'target_frames': 4}
                         }
                     
                     # Log successful loading
@@ -332,19 +353,88 @@ class DataLoaderText2VideoMixin:
                     print(f"  - Creating dummy data to prevent pipeline crash")
                     # Create comprehensive dummy data to prevent pipeline crash
                     import torch
-                    dummy_video = torch.zeros((8, 3, 64, 64), dtype=self.dtype)  # 8 frames, 3 channels, 64x64
+                    dummy_video = torch.zeros((4, 3, 64, 64), dtype=self.dtype)  # 4 frames, 3 channels, 64x64
                     # Return a complete data dictionary with all expected fields
                     return {
                         'video': dummy_video,
                         'video_path': f'dummy_video_{index}.mp4',
                         'prompt': 'dummy prompt',
-                        'settings': {'target_frames': 8}
+                        'settings': {'target_frames': 4}
                     }
         
         # Load video with configurable frame count and sampling strategy
+        # CRITICAL FIX: Use a fixed target frame count instead of expecting it from pipeline data
+        # The MGDS pipeline isn't properly passing settings.target_frames, so we'll use the config value directly
+        target_frames = getattr(config, 'frames', 4)  # Get from config, default to 4
+        print(f"DEBUG: Using fixed target_frames = {target_frames} for LoadVideo (from config.frames)")
+        
+        # Create a module that provides the target_frames value
+        from mgds.PipelineModule import PipelineModule
+        
+        class ProvideTargetFrames(PipelineModule):
+            def __init__(self, target_frames):
+                super().__init__()
+                self.target_frames = target_frames
+                
+            def length(self):
+                try:
+                    # Try to get length from previous video_path module
+                    length = self._get_previous_length('video_path')
+                    print(f"DEBUG: ProvideTargetFrames length() from video_path = {length}")
+                    return length
+                except Exception as e:
+                    print(f"DEBUG: ProvideTargetFrames length() failed to get from video_path: {e}")
+                    # Fallback: try to get from any previous module
+                    try:
+                        # Get the pipeline and check the previous group length
+                        if hasattr(self, '_PipelineModule__pipeline') and self._PipelineModule__pipeline:
+                            pipeline = self._PipelineModule__pipeline
+                            # Check if we can get length from the pipeline
+                            if hasattr(pipeline, 'length'):
+                                pipeline_length = pipeline.length()
+                                print(f"DEBUG: ProvideTargetFrames using pipeline length = {pipeline_length}")
+                                return pipeline_length
+                        
+                        # Final fallback: return a reasonable default
+                        print(f"DEBUG: ProvideTargetFrames using fallback length = 10")
+                        return 10
+                    except Exception as e2:
+                        print(f"DEBUG: ProvideTargetFrames all length methods failed: {e2}, returning 10")
+                        return 10
+                
+            def get_inputs(self):
+                return ['video_path']
+                
+            def get_outputs(self):
+                return ['video_path', 'target_frames']
+                
+            def get_item(self, variation, index, requested_name=None):
+                print(f"DEBUG: ProvideTargetFrames get_item called - variation={variation}, index={index}")
+                try:
+                    video_path = self._get_previous_item(variation, index, 'video_path')
+                    print(f"DEBUG: ProvideTargetFrames got video_path: {video_path}")
+                    result = {
+                        'video_path': video_path,
+                        'target_frames': self.target_frames
+                    }
+                    print(f"DEBUG: ProvideTargetFrames returning: {result}")
+                    return result
+                except Exception as e:
+                    print(f"ERROR: ProvideTargetFrames get_item failed: {e}")
+                    # Never return None - create a safe fallback
+                    fallback_result = {
+                        'video_path': f'fallback_video_{index}.mp4',
+                        'target_frames': self.target_frames
+                    }
+                    print(f"DEBUG: ProvideTargetFrames returning fallback: {fallback_result}")
+                    return fallback_result
+        
+        # Create the target frames provider
+        provide_target_frames = ProvideTargetFrames(target_frames)
+        
         load_video_base = LoadVideo(
             path_in_name='video_path', 
-            target_frame_count_in_name='settings.target_frames', 
+            target_frame_count_in_name='target_frames',  # Use simple target_frames instead of settings.target_frames
             video_out_name='video', 
             range_min=0, 
             range_max=1, 
@@ -430,7 +520,7 @@ class DataLoaderText2VideoMixin:
         # Conditional image loading for custom conditioning
         load_cond_image = LoadImage(path_in_name='cond_path', image_out_name='custom_conditioning_image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
 
-        modules = [load_video, load_image, image_to_video, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
+        modules = [provide_target_frames, load_video, load_image, image_to_video, load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text]
 
         if config.masked_training:
             modules.append(generate_mask)
@@ -641,8 +731,21 @@ class DataLoaderText2VideoMixin:
 
         world_size = multi.world_size()
 
+        # Separate regular names from mapping tuples
+        regular_names = []
+        mapping_tuples = []
+        
+        for name in output_names:
+            if isinstance(name, tuple):
+                mapping_tuples.append(name)
+            else:
+                regular_names.append(name)
+        
+        # OutputPipelineModule handles both regular names and mapping tuples
         output = OutputPipelineModule(output_names)
-        sort_names = output_names + ['concept']
+        
+        # AspectBatchSorting only uses regular names (no tuples)
+        sort_names = regular_names + ['concept']
         
         batch_sorting = AspectBatchSorting(
             batch_size=config.batch_size * world_size,

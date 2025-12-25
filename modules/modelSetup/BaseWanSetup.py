@@ -168,7 +168,7 @@ class BaseWanSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            vae_scaling_factor = model.vae.config['scaling_factor']
+            vae_scaling_factor = getattr(model.vae.config, 'scaling_factor', 0.18215)
 
             # Encode text prompt
             text_encoder_output = model.encode_text(
@@ -176,7 +176,6 @@ class BaseWanSetup(
                 batch_size=batch['latent_video'].shape[0],
                 rand=rand,
                 tokens=batch.get("tokens"),
-                tokens_mask=batch.get("tokens_mask"),
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_output=batch['text_encoder_hidden_state'] \
                     if 'text_encoder_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,

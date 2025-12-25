@@ -229,11 +229,27 @@ class WanModel(BaseModel):
         # encode text
         with self.text_encoder_autocast_context:
             if text_encoder_output is None and self.text_encoder is not None:
-                text_encoder_output = self.text_encoder(tokens)[0]
+                encoder_result = self.text_encoder(tokens)
+                if isinstance(encoder_result, (list, tuple)):
+                    text_encoder_output = encoder_result[0]
+                else:
+                    text_encoder_output = encoder_result
             
             if text_encoder_output is None:
                 text_encoder_output = torch.zeros(
                     size=(batch_size, 77, 768),  # Default dimensions
+                    device=train_device,
+                    dtype=self.train_dtype.torch_dtype(),
+                )
+
+        # Ensure we have a proper tensor before applying embeddings
+        if not isinstance(text_encoder_output, torch.Tensor):
+            if isinstance(text_encoder_output, (list, tuple)):
+                text_encoder_output = text_encoder_output[0] if text_encoder_output else None
+            
+            if text_encoder_output is None or not isinstance(text_encoder_output, torch.Tensor):
+                text_encoder_output = torch.zeros(
+                    size=(batch_size, 77, 768),
                     device=train_device,
                     dtype=self.train_dtype.torch_dtype(),
                 )
@@ -245,12 +261,22 @@ class WanModel(BaseModel):
             text_encoder_output,
         )
 
+        # Ensure we still have a tensor after applying embeddings
+        if not isinstance(text_encoder_output, torch.Tensor):
+            text_encoder_output = torch.zeros(
+                size=(batch_size, 77, 768),
+                device=train_device,
+                dtype=self.train_dtype.torch_dtype(),
+            )
+
         # apply dropout
-        if text_encoder_dropout_probability is not None:
-            dropout_text_encoder_mask = (torch.tensor(
+        if text_encoder_dropout_probability is not None and hasattr(text_encoder_output, 'dtype'):
+            dropout_text_encoder_mask = torch.tensor(
                 [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
+                device=train_device,
+                dtype=text_encoder_output.dtype
+            )
+            text_encoder_output = text_encoder_output * dropout_text_encoder_mask.view(-1, 1, 1)
 
         return text_encoder_output
 

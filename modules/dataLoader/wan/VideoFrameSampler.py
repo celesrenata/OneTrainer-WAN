@@ -61,45 +61,63 @@ class VideoFrameSampler(PipelineModule):
         return [self.video_out_name]
     
     def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
-        video = self._get_previous_item(variation, index, self.video_in_name)
-        video_path = self._get_previous_item(variation, index, self.video_path_in_name)
-        target_frames = self._get_previous_item(variation, index, self.target_frames_in_name)
-        
-        # Ensure video is in the correct format
-        if video.dim() == 5:  # [batch, frames, channels, height, width]
-            video = video.squeeze(0)  # Remove batch dimension
-        
-        num_frames, channels, height, width = video.shape
-        
-        # If we already have the target number of frames, return as-is
-        if num_frames == target_frames:
-            return {self.video_out_name: video}
-        
-        # Sample frame indices based on strategy
         try:
-            frame_indices = sample_video_frames(
-                video_path, 
-                target_frames, 
-                self.sampling_strategy, 
-                self.seed
-            )
+            video = self._get_previous_item(variation, index, self.video_in_name)
+            video_path = self._get_previous_item(variation, index, self.video_path_in_name)
+            target_frames = self._get_previous_item(variation, index, self.target_frames_in_name)
+            
+            # Validate inputs
+            if video is None:
+                print(f"ERROR: VideoFrameSampler got None video for index {index}")
+                return None
+            if video_path is None:
+                print(f"ERROR: VideoFrameSampler got None video_path for index {index}")
+                return None
+            if target_frames is None:
+                print(f"ERROR: VideoFrameSampler got None target_frames for index {index}")
+                return None
+            
+            # Ensure video is in the correct format
+            if video.dim() == 5:  # [batch, frames, channels, height, width]
+                video = video.squeeze(0)  # Remove batch dimension
+            
+            num_frames, channels, height, width = video.shape
+            
+            # If we already have the target number of frames, return as-is
+            if num_frames == target_frames:
+                return {self.video_out_name: video}
+            
+            # Sample frame indices based on strategy
+            try:
+                frame_indices = sample_video_frames(
+                    video_path, 
+                    target_frames, 
+                    self.sampling_strategy, 
+                    self.seed
+                )
+            except Exception as e:
+                # Fallback to uniform sampling if video path sampling fails
+                print(f"Warning: Frame sampling failed for {video_path}, using uniform fallback: {e}")
+                frame_indices = self._uniform_sample_indices(num_frames, target_frames)
+            
+            # Ensure indices are within bounds
+            frame_indices = [min(idx, num_frames - 1) for idx in frame_indices]
+            
+            # Sample the frames
+            sampled_video = video[frame_indices]
+            
+            # Pad with last frame if we don't have enough frames
+            if len(frame_indices) < target_frames:
+                last_frame = sampled_video[-1:].repeat(target_frames - len(frame_indices), 1, 1, 1)
+                sampled_video = torch.cat([sampled_video, last_frame], dim=0)
+            
+            return {self.video_out_name: sampled_video}
+            
         except Exception as e:
-            # Fallback to uniform sampling if video path sampling fails
-            print(f"Warning: Frame sampling failed for {video_path}, using uniform fallback: {e}")
-            frame_indices = self._uniform_sample_indices(num_frames, target_frames)
-        
-        # Ensure indices are within bounds
-        frame_indices = [min(idx, num_frames - 1) for idx in frame_indices]
-        
-        # Sample the frames
-        sampled_video = video[frame_indices]
-        
-        # Pad with last frame if we don't have enough frames
-        if len(frame_indices) < target_frames:
-            last_frame = sampled_video[-1:].repeat(target_frames - len(frame_indices), 1, 1, 1)
-            sampled_video = torch.cat([sampled_video, last_frame], dim=0)
-        
-        return {self.video_out_name: sampled_video}
+            print(f"ERROR: VideoFrameSampler failed for index {index}: {e}")
+            import traceback
+            print(f"VideoFrameSampler traceback: {traceback.format_exc()}")
+            return None
     
     def _uniform_sample_indices(self, total_frames: int, target_frames: int) -> list[int]:
         """Fallback uniform sampling when video path is not available."""

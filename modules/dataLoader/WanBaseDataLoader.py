@@ -21,6 +21,7 @@ from mgds.MGDS import MGDS, TrainDataLoader
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.DiskCache import DiskCache
+from modules.dataLoader.pipeline.ValidatedDiskCache import ValidatedDiskCache
 from mgds.pipelineModules.EncodeClipText import EncodeClipText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.MapData import MapData
@@ -114,7 +115,7 @@ class WanBaseDataLoader(
             video_in_name='video',
             video_path_in_name='video_path',
             video_out_name='sampled_video',
-            target_frames_in_name='settings.target_frames',
+            target_frames_in_name='target_frames',  # Fixed: use 'target_frames' instead of 'settings.target_frames'
             sampling_strategy=self._get_frame_sampling_strategy(config),
             seed=getattr(config, 'seed', None)
         )
@@ -168,6 +169,9 @@ class WanBaseDataLoader(
         )
 
         modules = [video_frame_sampler, rescale_video, encode_video]
+        print(f"DEBUG: Created modules list with {len(modules)} modules")
+        for i, module in enumerate(modules):
+            print(f"DEBUG: Module {i}: {type(module).__name__}")
 
         if model.tokenizer and model.text_encoder:
             modules.append(add_embeddings_to_prompt)
@@ -182,7 +186,7 @@ class WanBaseDataLoader(
 
     def _cache_modules(self, config: TrainConfig, model: WanModel):
         """Configure caching for video data."""
-        video_split_names = ['latent_video', 'original_resolution', 'crop_offset']
+        video_split_names = ['original_resolution', 'crop_offset']  # Removed latent_video - comes from TemporalConsistencyVAE
 
         if config.masked_training or config.model_type.has_mask_input():
             video_split_names.append('latent_mask')
@@ -220,7 +224,7 @@ class WanBaseDataLoader(
             model.eval()
             torch_gc()
 
-        video_disk_cache = DiskCache(
+        video_disk_cache = ValidatedDiskCache(
             cache_dir=video_cache_dir, 
             split_names=video_split_names, 
             aggregate_names=video_aggregate_names, 
@@ -229,10 +233,11 @@ class WanBaseDataLoader(
             balancing_strategy_in_name='concept.balancing_strategy', 
             variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], 
             group_enabled_in_name='concept.enabled', 
-            before_cache_fun=before_cache_video_fun
+            before_cache_fun=before_cache_video_fun,
+            safe_mode=True  # Enable safe mode for enhanced error handling
         )
 
-        text_disk_cache = DiskCache(
+        text_disk_cache = ValidatedDiskCache(
             cache_dir=text_cache_dir, 
             split_names=text_split_names, 
             aggregate_names=[], 
@@ -241,7 +246,8 @@ class WanBaseDataLoader(
             balancing_strategy_in_name='concept.balancing_strategy', 
             variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], 
             group_enabled_in_name='concept.enabled', 
-            before_cache_fun=before_cache_text_fun
+            before_cache_fun=before_cache_text_fun,
+            safe_mode=True  # Enable safe mode for enhanced error handling
         )
 
         modules = []
@@ -276,6 +282,7 @@ class WanBaseDataLoader(
             'prompt_with_embeddings',
             'tokens',
             'original_resolution', 'crop_resolution', 'crop_offset',
+            'concept',  # Add concept for concept_type mapping
         ]
 
         if config.masked_training or config.model_type.has_mask_input():
@@ -294,7 +301,9 @@ class WanBaseDataLoader(
             torch_gc()
 
         return self._video_output_modules_from_out_names(
-            output_names=output_names,
+            output_names=output_names + [
+                ('concept.type', 'concept_type'),  # Map concept.type to concept_type
+            ],
             config=config,
             model=model,
             before_cache_video_fun=before_cache_video_fun,
@@ -431,152 +440,9 @@ class WanBaseDataLoader(
                 print(f"DEBUG: Processing module {module_name}")
                 
                 if hasattr(module, 'get_item'):
-                    print(f"DEBUG: Wrapping module {module_name} with SafePipelineModule")
-                    # Import the SafePipelineModule class from the mixin
-                    from modules.dataLoader.mixin.DataLoaderText2VideoMixin import DataLoaderText2VideoMixin
-                    
-                    # Create a safety wrapper for this module
-                    # Import PipelineModule for proper inheritance
-                    from mgds.PipelineModule import PipelineModule
-                    
-                    class SafePipelineModule(PipelineModule):
-                        def __init__(self, wrapped_module, module_name="Unknown", dtype=torch.float32):
-                            self.wrapped_module = wrapped_module
-                            self.module_name = module_name
-                            self.dtype = dtype
-                            super().__init__()
-                            
-                        def length(self):
-                            try:
-                                # Check if the module has been initialized by MGDS yet
-                                if not hasattr(self.wrapped_module, '_PipelineModule__module_index'):
-                                    # Module not initialized yet - try to get a reasonable estimate
-                                    if hasattr(self.wrapped_module, '__class__') and 'CollectPaths' in str(self.wrapped_module.__class__):
-                                        # For CollectPaths, estimate from concept stats
-                                        print(f"INFO: {self.module_name} not initialized yet, estimating length from concept stats")
-                                        return 10  # Based on concept stats showing 10 images
-                                    else:
-                                        # For other modules, return 1 as fallback
-                                        return 1
-                                
-                                length = self.wrapped_module.length()
-                                # Always log length calls to trace data flow
-                                print(f"INFO: {self.module_name} length() returned: {length}")
-                                return length
-                            except Exception as e:
-                                print(f"WARNING: {self.module_name} length() failed: {e}, returning fallback length 1")
-                                return 1
-                                
-                        def get_inputs(self):
-                            return self.wrapped_module.get_inputs()
-                            
-                        def get_outputs(self):
-                            return self.wrapped_module.get_outputs()
-                        
-                        def init(self, pipeline, seed, index, state):
-                            """Initialize the module - required by MGDS pipeline"""
-                            print(f"DEBUG: {self.module_name} init called - seed={seed}, index={index}")
-                            try:
-                                if hasattr(self.wrapped_module, 'init'):
-                                    return self.wrapped_module.init(pipeline, seed, index, state)
-                                else:
-                                    print(f"DEBUG: {self.module_name} wrapped module has no init method, skipping")
-                                    return None
-                            except Exception as e:
-                                print(f"DEBUG: {self.module_name} init failed: {e}")
-                                return None
-                        
-                        def start(self, epoch):
-                            """Start epoch - required by some MGDS modules"""
-                            print(f"DEBUG: {self.module_name} start called - epoch={epoch}")
-                            try:
-                                if hasattr(self.wrapped_module, 'start'):
-                                    return self.wrapped_module.start(epoch)
-                                else:
-                                    print(f"DEBUG: {self.module_name} wrapped module has no start method, skipping")
-                                    return None
-                            except Exception as e:
-                                print(f"DEBUG: {self.module_name} start failed: {e}")
-                                return None
-                        
-                        def end(self):
-                            """End processing - required by some MGDS modules"""
-                            print(f"DEBUG: {self.module_name} end called")
-                            try:
-                                if hasattr(self.wrapped_module, 'end'):
-                                    return self.wrapped_module.end()
-                                else:
-                                    print(f"DEBUG: {self.module_name} wrapped module has no end method, skipping")
-                                    return None
-                            except Exception as e:
-                                print(f"DEBUG: {self.module_name} end failed: {e}")
-                                return None
-                        
-                        def clear_item_cache(self):
-                            """Clear item cache - required by MGDS pipeline"""
-                            # Reduce debug noise - only log errors, not every call
-                            
-                            # First call the parent class method to initialize __local_cache
-                            super().clear_item_cache()
-                            
-                            # Then optionally call the wrapped module's method
-                            try:
-                                if hasattr(self.wrapped_module, 'clear_item_cache'):
-                                    return self.wrapped_module.clear_item_cache()
-                                else:
-                                    # Only log if we need to debug specific modules
-                                    pass
-                                    return None
-                            except Exception as e:
-                                print(f"ERROR: {self.module_name} clear_item_cache failed: {e}")
-                                return None
-                            
-                        def get_item(self, variation, index, requested_name=None):
-                            print(f"DEBUG: {self.module_name} get_item called - variation={variation}, index={index}, requested_name={requested_name}")
-                            try:
-                                result = self.wrapped_module.get_item(variation, index, requested_name)
-                                print(f"DEBUG: {self.module_name} returned result type: {type(result)}")
-                                if result is None:
-                                    print(f"ERROR: {self.module_name} returned None for item {index}, creating safe fallback")
-                                    fallback = self._create_safe_fallback_data(index)
-                                    print(f"DEBUG: {self.module_name} created fallback: {type(fallback)} with keys: {list(fallback.keys()) if isinstance(fallback, dict) else 'not dict'}")
-                                    return fallback
-                                else:
-                                    print(f"DEBUG: {self.module_name} returned valid result with keys: {list(result.keys()) if isinstance(result, dict) else 'not dict'}")
-                                return result
-                            except Exception as e:
-                                print(f"ERROR: {self.module_name} failed for item {index}: {e}, creating safe fallback")
-                                import traceback
-                                print(f"DEBUG: {self.module_name} exception traceback: {traceback.format_exc()}")
-                                fallback = self._create_safe_fallback_data(index)
-                                print(f"DEBUG: {self.module_name} created fallback after exception: {type(fallback)} with keys: {list(fallback.keys()) if isinstance(fallback, dict) else 'not dict'}")
-                                return fallback
-                                
-                        def _create_safe_fallback_data(self, index):
-                            print(f"DEBUG: {self.module_name} creating fallback data for index {index}")
-                            fallback_data = {
-                                'video_path': f'fallback_video_{index}.mp4',
-                                'prompt': 'fallback prompt for training',
-                                'concept': {'name': 'fallback_concept', 'enabled': True},
-                                'settings': {'target_frames': 8}
-                            }
-                            print(f"DEBUG: {self.module_name} final fallback data keys: {list(fallback_data.keys())}")
-                            return fallback_data
-                    
-                    safe_module = SafePipelineModule(
-                        module, 
-                        module_name=module_name,
-                        dtype=model.train_dtype.torch_dtype()
-                    )
-                    
-                    # Log the length immediately after wrapping
-                    try:
-                        length = safe_module.length()
-                        print(f"INFO: {module_name} wrapped length: {length}")
-                    except Exception as e:
-                        print(f"WARNING: {module_name} length check failed: {e}")
-                    
-                    safe_group.append(safe_module)
+                    # Temporarily disable all wrapping to allow proper MGDS initialization
+                    print(f"DEBUG: NOT wrapping module {module_name} to preserve MGDS initialization")
+                    safe_group.append(module)
                 else:
                     print(f"DEBUG: Module {module_name} does not have get_item, adding as-is")
                     safe_group.append(module)

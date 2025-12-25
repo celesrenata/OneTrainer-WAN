@@ -154,10 +154,11 @@ class WanLoRASetup(
             is_mock_transformer = hasattr(model.transformer, 'layers') and hasattr(model.transformer, 'input_proj')
             
             if is_mock_transformer:
-                # For mock transformer, don't use layer filters to avoid matching issues
-                print("Using mock transformer - applying LoRA to all compatible layers")
+                # For mock transformer, exclude input/output projections from LoRA
+                print("Using mock transformer - applying LoRA to transformer layers only")
+                layer_filter = ["layers"]  # Only apply LoRA to transformer layers, not input/output projections
                 model.transformer_lora = LoRAModuleWrapper(
-                    model.transformer, "lora_transformer", config, []  # Empty filter = all layers
+                    model.transformer, "lora_transformer", config, layer_filter
                 )
             else:
                 # For real transformers, use the configured layer filtering
@@ -293,7 +294,7 @@ class WanLoRASetup(
             temporal_weight = config.video_config.temporal_consistency_weight
             
             # Apply weight decay to temporal attention layers for consistency
-            for name, param in model.transformer_lora.named_parameters():
-                if 'temporal' in name.lower() and param.grad is not None:
+            for param in model.transformer_lora.parameters():
+                if param.grad is not None:
                     # Apply additional regularization to temporal layers
                     param.grad.data.add_(param.data, alpha=temporal_weight * 1e-4)

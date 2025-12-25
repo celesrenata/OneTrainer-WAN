@@ -268,7 +268,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             betas: Tensor | None = None,
             alphas_cumprod_fun: Callable[[Tensor, int], Tensor] | None = None,
     ) -> Tensor:
-        loss_weight = batch['loss_weight']
+        loss_weight = batch.get('loss_weight', torch.ones(1, device=batch['latent_image'].device))
         if self.__coefficients is None and betas is not None:
             self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas.to(train_device))
 
@@ -312,7 +312,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             train_device: torch.device,
             sigmas: Tensor | None = None,
     ) -> Tensor:
-        loss_weight = batch['loss_weight']
+        loss_weight = batch.get('loss_weight', torch.ones(1, device=batch['latent_video'].device))
         if self.__sigmas is None and sigmas is not None:
             num_timesteps = sigmas.shape[0]
             all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=train_device)
