@@ -94,6 +94,8 @@ class DataLoaderText2VideoMixin:
         
         # Wrap CollectPaths with our safety wrapper
         collect_paths = SafeCollectPaths(collect_paths)
+        
+        print(f"DEBUG: CollectPaths created and wrapped with safety wrapper")
 
         mask_path = ModifyPath(in_name='video_path', out_name='mask_path', postfix='-masklabel', extension='.png')
         cond_path = ModifyPath(in_name='video_path', out_name='cond_path', postfix='-condlabel', extension='.png')
@@ -647,6 +649,8 @@ class DataLoaderText2VideoMixin:
             resolution_in_name='crop_resolution',
             names=sort_names,
         )
+        
+        print(f"DEBUG: AspectBatchSorting created with batch_size={config.batch_size * world_size}, names={sort_names}")
         
         sort_names = output_names + ['concept']
         distributed_sampler = DistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
