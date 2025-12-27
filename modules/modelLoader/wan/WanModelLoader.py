@@ -41,16 +41,16 @@ class WanModelLoader(
                     'guidance_embeds': False,
                     'in_channels': 48,  # WAN 2.2 VAE latent channels
                     'out_channels': 48,  # WAN 2.2 VAE latent channels
-                    'num_layers': 6,    # Reduced from 30 to 6 for memory
-                    'num_attention_heads': 12,  # Reduced from 24 to 12
-                    'attention_head_dim': 64,   # Reduced from 128 to 64
-                    'embed_dim': 768
+                    'num_layers': 12,    # Increased from 6 to 12 layers
+                    'num_attention_heads': 16,  # Increased from 12 to 16
+                    'attention_head_dim': 96,   # Increased from 64 to 96
+                    'embed_dim': 1536   # Increased from 768 to 1536
                 })()
                 
-                # Basic transformer components (smaller)
-                self.embed_dim = 768
-                self.num_layers = 6  # Much smaller than real 30 layers
-                self.num_heads = 12
+                # Basic transformer components (bigger)
+                self.embed_dim = 1536  # Doubled
+                self.num_layers = 12   # Doubled
+                self.num_heads = 16    # Increased
                 
                 # Input projection from 48 latent channels to embed_dim
                 self.input_proj = torch.nn.Linear(48, self.embed_dim, dtype=dtype)
@@ -63,9 +63,9 @@ class WanModelLoader(
                             self.embed_dim, self.num_heads, batch_first=True, dtype=dtype
                         ),
                         'mlp': torch.nn.Sequential(
-                            torch.nn.Linear(self.embed_dim, self.embed_dim * 2, dtype=dtype),  # Reduced from 4x to 2x
+                            torch.nn.Linear(self.embed_dim, self.embed_dim * 4, dtype=dtype),  # Back to 4x expansion
                             torch.nn.GELU(),
-                            torch.nn.Linear(self.embed_dim * 2, self.embed_dim, dtype=dtype)
+                            torch.nn.Linear(self.embed_dim * 4, self.embed_dim, dtype=dtype)
                         ),
                         'norm1': torch.nn.LayerNorm(self.embed_dim, dtype=dtype),
                         'norm2': torch.nn.LayerNorm(self.embed_dim, dtype=dtype)
@@ -263,10 +263,11 @@ class WanModelLoader(
         )
 
         if include_text_encoder:
-            # Load text encoder - will need to be adapted for actual WAN 2.2 text encoder
+            # Load text encoder - use UMT5EncoderModel for WAN 2.2
             try:
+                from transformers import UMT5EncoderModel
                 text_encoder = self._load_transformers_sub_module(
-                    PreTrainedModel,  # Will be replaced with actual WAN 2.2 text encoder class
+                    UMT5EncoderModel,  # Correct WAN 2.2 text encoder class
                     weight_dtypes.text_encoder,
                     weight_dtypes.train_dtype,
                     base_model_name,
@@ -333,11 +334,10 @@ class WanModelLoader(
         else:
             # Load transformer from diffusers format - will need actual WAN 2.2 transformer class
             try:
-                # First, validate that the real WAN 2.2 transformer can be loaded
-                print("Validating real WAN 2.2 transformer compatibility...")
+                # Force load the real WAN 2.2 transformer with maximum memory optimization
                 from diffusers.models.transformers.transformer_wan import WanTransformer3DModel
                 
-                real_transformer = self._load_diffusers_sub_module(
+                transformer = self._load_diffusers_sub_module(
                     WanTransformer3DModel,
                     weight_dtypes.transformer,
                     weight_dtypes.train_dtype,
@@ -345,21 +345,11 @@ class WanModelLoader(
                     "transformer",
                     quantization,
                 )
-                print(f"✅ Real WAN 2.2 transformer validated: {type(real_transformer)}")
-                print(f"✅ Config: in_channels={real_transformer.config.in_channels}, layers={real_transformer.config.num_layers}")
-                
-                # For training on limited GPU, use memory-efficient version
-                print("Using memory-efficient transformer for training...")
-                transformer = self._create_mock_transformer(weight_dtypes.transformer.torch_dtype())
-                print(f"✅ Memory-efficient transformer created: {transformer.config.num_layers} layers")
-                
-                # Clean up the real transformer to free memory
-                del real_transformer
-                torch.cuda.empty_cache()
+                print(f"✅ Real WAN 2.2 transformer loaded: {type(transformer)}")
+                print(f"📊 Transformer: {transformer.config.num_layers} layers, {transformer.config.num_attention_heads} heads")
                 
             except Exception as e:
-                print(f"Could not validate real transformer: {e}")
-                print("Using memory-efficient transformer...")
+                print(f"Could not load real transformer: {e}")
                 transformer = self._create_mock_transformer(weight_dtypes.transformer.torch_dtype())
 
         model.model_type = model_type
@@ -370,6 +360,9 @@ class WanModelLoader(
         model.transformer = transformer if transformer is not None else self._create_mock_transformer(
             torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype()
         )
+        
+        # Apply CPU offloading after model assembly
+        self._apply_cpu_offloading(model, weight_dtypes)
 
     def __load_safetensors(
             self,
@@ -456,6 +449,9 @@ class WanModelLoader(
         model.transformer = transformer if transformer is not None else self._create_mock_transformer(
             torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype()
         )
+        
+        # Apply CPU offloading after model assembly
+        self._apply_cpu_offloading(model, weight_dtypes)
 
     def __after_load(self, model: WanModel):
         if model.tokenizer is not None:
@@ -572,6 +568,9 @@ class WanModelLoader(
         model.tokenizer = tokenizer
         model.noise_scheduler = noise_scheduler
         
+        # Apply CPU offloading after model assembly
+        self._apply_cpu_offloading(model, weight_dtypes)
+        
         print(f"Mock WAN 2.2 model created successfully for video pipeline testing")
 
     def _create_mock_vae(self, dtype):
@@ -617,6 +616,32 @@ class WanModelLoader(
                     return torch.randn(B, 3, H*8, W*8, dtype=dtype, device=z.device)
         
         return MockVideoVAE().to(dtype)
+    
+    def _apply_cpu_offloading(self, model, weight_dtypes):
+        """Apply CPU offloading based on configuration."""
+        # Text encoder CPU offloading
+        if (hasattr(weight_dtypes, 'text_encoder_config') and 
+            hasattr(weight_dtypes.text_encoder_config, 'cpu_offload') and 
+            weight_dtypes.text_encoder_config.cpu_offload and 
+            model.text_encoder is not None):
+            model.text_encoder = model.text_encoder.to('cpu')
+            print("✅ Text encoder moved to CPU per configuration")
+            
+        # VAE CPU offloading
+        if (hasattr(weight_dtypes, 'vae_config') and 
+            hasattr(weight_dtypes.vae_config, 'cpu_offload') and 
+            weight_dtypes.vae_config.cpu_offload and 
+            model.vae is not None):
+            model.vae = model.vae.to('cpu')
+            print("✅ VAE moved to CPU per configuration")
+            
+        # Transformer CPU offloading
+        if (hasattr(weight_dtypes, 'transformer_config') and 
+            hasattr(weight_dtypes.transformer_config, 'cpu_offload') and 
+            weight_dtypes.transformer_config.cpu_offload and 
+            model.transformer is not None):
+            model.transformer = model.transformer.to('cpu')
+            print("✅ Transformer moved to CPU per configuration")
     
     def _create_mock_text_encoder_and_tokenizer(self, dtype):
         """Create mock text encoder and tokenizer."""

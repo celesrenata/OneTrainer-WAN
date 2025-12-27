@@ -464,6 +464,11 @@ class TrainingTab:
                              tooltip="The number of additional clip layers to skip. 0 = the model default")
             components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
 
+        # CPU offload
+        components.label(frame, 5, 0, "CPU Offload",
+                         tooltip="Move text encoder to CPU to save GPU memory")
+        components.switch(frame, 5, 1, self.ui_state, "text_encoder.cpu_offload")
+
     def __create_text_encoder_n_frame(
             self,
             master,
@@ -531,6 +536,12 @@ class TrainingTab:
                              tooltip="Overrides the number of tokens used for captions. If empty, the model default is used, which is 512 on Flux. Comfy samples with 256 tokens though. 77 is the default only for backwards compatibility.")
             components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}_sequence_length")
             row += 1
+
+        # CPU offload
+        components.label(frame, row, 0, f"Text Encoder {i} CPU Offload",
+                         tooltip=f"Move text encoder {i} to CPU to save GPU memory")
+        components.switch(frame, row, 1, self.ui_state, f"text_encoder{suffix}.cpu_offload")
+        row += 1
 
     def __create_embedding_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -626,6 +637,11 @@ class TrainingTab:
             components.label(frame, 4, 0, "Guidance Scale",
                              tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
             components.entry(frame, 4, 1, self.ui_state, "transformer.guidance_scale")
+
+        # CPU offload
+        components.label(frame, 5, 0, "Transformer CPU Offload",
+                         tooltip="Move transformer to CPU to save GPU memory")
+        components.switch(frame, 5, 1, self.ui_state, "transformer.cpu_offload")
 
     def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False, supports_dynamic_timestep_shifting: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

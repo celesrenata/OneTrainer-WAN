@@ -301,6 +301,7 @@ class TrainModelPartConfig(BaseConfig):
     train_embedding: bool
     attention_mask: bool
     guidance_scale: float
+    cpu_offload: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -321,6 +322,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))
         data.append(("guidance_scale", 1.0, float, False))
+        data.append(("cpu_offload", False, bool, False))
 
         return TrainModelPartConfig(data)
 
@@ -831,7 +833,7 @@ class TrainConfig(BaseConfig):
         return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
-        return ModelWeightDtypes(
+        weight_dtypes = ModelWeightDtypes(
             self.train_dtype,
             self.fallback_train_dtype,
             self.unet.weight_dtype,
@@ -849,6 +851,13 @@ class TrainConfig(BaseConfig):
             self.lora_weight_dtype,
             self.embedding_weight_dtype,
         )
+        
+        # Attach config objects for CPU offloading
+        weight_dtypes.text_encoder_config = self.text_encoder
+        weight_dtypes.vae_config = self.vae
+        weight_dtypes.transformer_config = self.transformer
+        
+        return weight_dtypes
 
     def model_names(self) -> ModelNames:
         return ModelNames(

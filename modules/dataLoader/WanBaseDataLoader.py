@@ -18,6 +18,7 @@ from modules.util.video_util import (
 )
 
 from mgds.MGDS import MGDS, TrainDataLoader
+from mgds.pipelineModules import *
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.DiskCache import DiskCache
@@ -110,12 +111,14 @@ class WanBaseDataLoader(
 
     def _preparation_modules(self, config: TrainConfig, model: WanModel):
         """Prepare video data for WAN 2.2 training."""
+        print("DEBUG: WanBaseDataLoader._preparation_modules() called")
+        
         # Sample video frames using the configured strategy
         video_frame_sampler = VideoFrameSampler(
             video_in_name='video',
             video_path_in_name='video_path',
             video_out_name='sampled_video',
-            target_frames_in_name='target_frames',  # Fixed: use 'target_frames' instead of 'settings.target_frames'
+            target_frames_in_name='target_frames',
             sampling_strategy=self._get_frame_sampling_strategy(config),
             seed=getattr(config, 'seed', None)
         )
@@ -130,7 +133,38 @@ class WanBaseDataLoader(
             out_range_max=1
         )
         
-        # Encode video frames using VAE with temporal consistency
+        # Add text processing modules that need access to 'prompt' from load_input modules
+        text_modules = []
+        if model.tokenizer and model.text_encoder:
+            # Pass-through prompt so cache modules can access it
+            pass_through_prompt = MapData(
+                in_name='prompt',
+                out_name='prompt_passthrough', 
+                map_fn=lambda x: x if x is not None else 'a video'  # Fallback prompt
+            )
+            
+            # Add embeddings to prompt for text encoder - use prompt_passthrough from preparation
+            add_embeddings_to_prompt = MapData(
+                in_name='prompt_passthrough',  # Use passthrough from preparation modules
+                out_name='prompt_with_embeddings', 
+                map_fn=model.add_text_encoder_embeddings_to_prompt
+            )
+            
+            # Encode text using WAN-specific video text encoder
+            encode_video_text = WanVideoTextEncoder(
+                prompt_in_name='prompt_with_embeddings',
+                tokens_out_name='tokens',
+                hidden_state_out_name='text_encoder_hidden_state',
+                pooled_out_name='text_encoder_pooled_state',
+                tokenizer=model.tokenizer,
+                text_encoder=model.text_encoder,
+                max_token_length=77,
+                autocast_contexts=[model.autocast_context],
+                dtype=model.train_dtype.torch_dtype()
+            )
+            text_modules = [pass_through_prompt, add_embeddings_to_prompt, encode_video_text]
+
+        # Add TemporalConsistencyVAE to preparation modules 
         temporal_consistency_weight = getattr(config, 'temporal_consistency_weight', 1.0)
         encode_video = TemporalConsistencyVAE(
             video_in_name='scaled_video',
@@ -140,52 +174,29 @@ class WanBaseDataLoader(
             autocast_contexts=[model.autocast_context],
             dtype=model.train_dtype.torch_dtype()
         )
-        
-        # Downscale mask for latent space
-        downscale_mask = ScaleImage(
-            in_name='mask', 
-            out_name='latent_mask', 
-            factor=0.125
-        )
-        
-        # Add embeddings to prompt for text encoder
-        add_embeddings_to_prompt = MapData(
-            in_name='prompt', 
-            out_name='prompt_with_embeddings', 
-            map_fn=model.add_text_encoder_embeddings_to_prompt
-        )
-        
-        # Encode text using WAN-specific video text encoder
-        encode_video_text = WanVideoTextEncoder(
-            prompt_in_name='prompt_with_embeddings',
-            tokens_out_name='tokens',
-            hidden_state_out_name='text_encoder_hidden_state',
-            pooled_out_name='text_encoder_pooled_state',
-            tokenizer=model.tokenizer,
-            text_encoder=model.text_encoder,
-            max_token_length=77,
-            autocast_contexts=[model.autocast_context],
-            dtype=model.train_dtype.torch_dtype()
-        )
 
-        modules = [video_frame_sampler, rescale_video, encode_video]
+        modules = [video_frame_sampler, rescale_video, encode_video] + text_modules
+        print(f"DEBUG: _preparation_modules returning {len(modules)} modules:")
         for i, module in enumerate(modules):
-            print(f"Module {i}: {type(module).__name__}")
-
-        if model.tokenizer and model.text_encoder:
-            modules.append(add_embeddings_to_prompt)
-            
-            if not config.train_text_encoder_or_embedding():
-                modules.append(encode_video_text)
+            print(f"  {i}: {type(module).__name__} -> {module.get_outputs()}")
 
         if config.masked_training:
+            downscale_mask = ScaleImage(
+                in_name='mask', 
+                out_name='latent_mask', 
+                factor=0.125
+            )
             modules.append(downscale_mask)
 
         return modules
 
     def _cache_modules(self, config: TrainConfig, model: WanModel):
-        """Configure caching for video data."""
-        video_split_names = ['original_resolution', 'crop_offset']  # Removed latent_video - comes from TemporalConsistencyVAE
+        """Configure caching for video data - text encoding moved to preparation modules."""
+        
+        # Text encoding is now handled in preparation modules, not cache modules
+        # This prevents the TemporalConsistencyVAE from being overridden
+        
+        video_split_names = ['original_resolution', 'crop_offset']  # latent_video must come from TemporalConsistencyVAE only
 
         if config.masked_training or config.model_type.has_mask_input():
             video_split_names.append('latent_mask')
@@ -198,9 +209,11 @@ class WanBaseDataLoader(
         text_split_names = []
 
         sort_names = video_aggregate_names + video_split_names + [
+            'latent_video',  # CRITICAL: Add latent_video so AspectBatchSorting requests it from TemporalConsistencyVAE
             'prompt_with_embeddings', 'tokens', 'text_encoder_hidden_state', 'text_encoder_pooled_state',
             'concept'
         ]
+        print(f"DEBUG: sort_names = {sort_names}")
 
         if not config.train_text_encoder_or_embedding():
             text_split_names.extend(['tokens', 'text_encoder_hidden_state', 'text_encoder_pooled_state'])
@@ -250,13 +263,20 @@ class WanBaseDataLoader(
         )
 
         modules = []
+        
+        # Text processing is now in preparation modules where it can access prompt
 
         if config.latent_caching:
             modules.append(video_disk_cache)
 
         if config.latent_caching:
+            print(f"DEBUG: sort_names before filtering = {sort_names}")
+            print(f"DEBUG: video_aggregate_names = {video_aggregate_names}")
+            print(f"DEBUG: video_split_names = {video_split_names}")
             sort_names = [x for x in sort_names if x not in video_aggregate_names]
+            print(f"DEBUG: sort_names after video_aggregate filter = {sort_names}")
             sort_names = [x for x in sort_names if x not in video_split_names]
+            print(f"DEBUG: sort_names after video_split filter = {sort_names}")
 
             if not config.train_text_encoder_or_embedding():
                 modules.append(text_disk_cache)
@@ -277,7 +297,7 @@ class WanBaseDataLoader(
     def _output_modules(self, config: TrainConfig, model: WanModel):
         """Configure output modules for WAN 2.2 training."""
         output_names = [
-            'video_path', 'latent_video',
+            'video_path', 'latent_video',  # latent_video needed for AspectBatchSorting
             'prompt_with_embeddings',
             'tokens',
             'original_resolution', 'crop_resolution', 'crop_offset',

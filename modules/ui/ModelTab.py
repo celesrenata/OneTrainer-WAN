@@ -579,6 +579,11 @@ class ModelTab:
             components.options_kv(frame, row, 4,  self.__create_dtype_options(),
                                   self.ui_state, "vae.weight_dtype")
 
+            # vae CPU offload
+            components.label(frame, row, 5, "VAE CPU Offload",
+                             tooltip="Move VAE to CPU to save GPU memory")
+            components.switch(frame, row, 6, self.ui_state, "vae.cpu_offload")
+
             row += 1
 
         return row

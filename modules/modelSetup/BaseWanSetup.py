@@ -130,9 +130,22 @@ class BaseWanSetup(
             config: TrainConfig,
     ):
         if model.tokenizer is not None and model.text_encoder is not None:
+            # Handle different text encoder architectures
+            if hasattr(model.text_encoder, 'text_model'):
+                # T5-style models (T5EncoderModel)
+                token_embedding = model.text_encoder.text_model.embeddings.token_embedding
+            elif hasattr(model.text_encoder, 'shared'):
+                # UMT5-style models (UMT5EncoderModel)
+                token_embedding = model.text_encoder.shared
+            elif hasattr(model.text_encoder, 'encoder') and hasattr(model.text_encoder.encoder, 'embed_tokens'):
+                # Alternative UMT5 structure
+                token_embedding = model.text_encoder.encoder.embed_tokens
+            else:
+                raise AttributeError(f"Unknown text encoder structure: {type(model.text_encoder)}")
+                
             model.embedding_wrapper = AdditionalEmbeddingWrapper(
                 tokenizer=model.tokenizer,
-                orig_module=model.text_encoder.text_model.embeddings.token_embedding,
+                orig_module=token_embedding,
                 embeddings=model.all_text_encoder_embeddings(),
             )
 
@@ -208,6 +221,17 @@ class BaseWanSetup(
             )
 
             latent_input = scaled_noisy_latent_video
+            
+            # Fix tensor dimensions for WAN transformer: [batch, channels, frames, height, width]
+            if len(latent_input.shape) == 5:
+                # Check if dimensions need to be reordered
+                batch, dim1, dim2, height, width = latent_input.shape
+                if dim1 == 1 and dim2 == 48:
+                    # Swap channels and frames: [batch, 1, 48, h, w] -> [batch, 48, 1, h, w]
+                    latent_input = latent_input.transpose(1, 2)
+                    print(f"DEBUG: Fixed tensor shape from [{batch}, {dim1}, {dim2}, {height}, {width}] to {latent_input.shape}")
+            
+            print(f"DEBUG: Final latent_input shape: {latent_input.shape}")
 
             # Add guidance if supported
             if hasattr(model.transformer.config, 'guidance_embeds') and model.transformer.config.guidance_embeds:
@@ -217,13 +241,27 @@ class BaseWanSetup(
                 guidance = None
 
             with model.transformer_autocast_context:
-                predicted_flow = model.transformer(
-                    hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                    timestep=timestep,
-                    guidance=guidance.to(dtype=model.train_dtype.torch_dtype()) if guidance is not None else None,
-                    encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                    return_dict=True
-                ).sample
+                # Check if we're using the real WAN transformer (check for WanTransformer3DModel)
+                transformer_class_name = type(model.transformer).__name__
+                if 'WanTransformer3DModel' in str(type(model.transformer)) or hasattr(model.transformer, 'module'):
+                    # Real WAN transformer (possibly wrapped in LoRA) - doesn't support guidance
+                    print(f"DEBUG: text_encoder_output shape: {text_encoder_output.shape}")
+                    print(f"DEBUG: latent_input shape: {latent_input.shape}")
+                    predicted_flow = model.transformer(
+                        hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                        timestep=timestep,
+                        encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                        return_dict=True
+                    )
+                else:
+                    # Mock transformer supports guidance parameter
+                    predicted_flow = model.transformer(
+                        hidden_states=latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                        timestep=timestep,
+                        guidance=guidance.to(dtype=model.train_dtype.torch_dtype()) if guidance is not None else None,
+                        encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                        return_dict=True
+                    ).sample
 
             flow = latent_noise - scaled_latent_video
             model_output_data = {

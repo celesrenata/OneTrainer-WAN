@@ -917,7 +917,7 @@ class ConceptWindow(ctk.CTkToplevel):
         except KeyError:
             concept_path = self.get_concept_path(self.concept.path)
             if concept_path:
-                self.__get_concept_stats(False, 2)    #force rescan if config is empty, timeout of 2 sec
+                self.__get_concept_stats(True, 2)    #force advanced scan to detect captions
                 if self.concept.concept_stats["processing_time"] < 0.1:
                     self.__get_concept_stats(True, 2)    #do advanced scan automatically if basic took <0.1s
 

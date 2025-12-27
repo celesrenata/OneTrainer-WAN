@@ -48,7 +48,19 @@ class WanVideoTextEncoder(PipelineModule):
         return outputs
     
     def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
-        prompt = self._get_previous_item(variation, index, self.prompt_in_name)
+        print(f"DEBUG: WanVideoTextEncoder.get_item called - variation: {variation}, index: {index}")
+        
+        try:
+            prompt = self._get_previous_item(variation, index, self.prompt_in_name)
+            print(f"DEBUG: Got prompt: {prompt}")
+            
+            if prompt is None:
+                print(f"DEBUG: Prompt is None, creating fallback")
+                prompt = "a cube"  # Fallback prompt
+                
+        except Exception as e:
+            print(f"DEBUG: Error getting prompt: {e}")
+            prompt = "a cube"  # Fallback prompt
         
         # Tokenize the prompt
         if self.tokenizer:

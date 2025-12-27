@@ -163,10 +163,20 @@ class WanLoRASetup(
             else:
                 # For real transformers, use the configured layer filtering
                 # Add video-specific layer filtering for WAN 2.2
+                print(f"Debug: Current layer_filter = {layer_filter}")
+                
                 if hasattr(config, 'video_config') and config.video_config.use_temporal_attention:
                     # Focus on attention layers for temporal consistency
                     if not layer_filter or layer_filter == [""]:
-                        layer_filter = ["attn", "temporal_attn"]  # Default to attention layers
+                        layer_filter = ["blocks"]  # Apply to all transformer blocks
+                        print("Debug: Using video attention filter - blocks")
+                else:
+                    # Default to all transformer blocks if no specific filter
+                    if not layer_filter or layer_filter == [""]:
+                        layer_filter = ["blocks"]  # Apply to all transformer blocks
+                        print("Debug: Using default filter - blocks")
+                
+                print(f"Debug: Final layer_filter = {layer_filter}")
                 
                 model.transformer_lora = LoRAModuleWrapper(
                     model.transformer, "lora_transformer", config, layer_filter
